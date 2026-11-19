@@ -387,3 +387,4 @@ table.rank td { padding: 8px; border-top: 1px solid var(--line); }
 .sm-match img { width: 100%; max-height: 120px; object-fit: contain; background: #000; border-radius: 9px; }
 #smMatchMsg { white-space: pre-line; }
 #smMTabs button { font-size: 12.5px; padding: 7px 4px; white-space: nowrap; }
+#smMatchMsg, #smMsg { overflow-wrap: anywhere; font-size: 13px; }

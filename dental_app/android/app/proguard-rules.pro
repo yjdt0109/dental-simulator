@@ -6,3 +6,5 @@
 -dontwarn com.google.protobuf.**
 -dontwarn javax.lang.model.**
 -dontwarn com.google.auto.value.**
+-keep class com.google.common.flogger.** { *; }
+-dontwarn com.google.common.flogger.**

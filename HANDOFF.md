@@ -4,8 +4,8 @@
 > "HANDOFF.md 읽고 이어서 작업해줘"라고 하면 됩니다. 답변은 항상 한글로.
 
 ## 1. 현재 버전
-- 태블릿 앱(안드로이드 APK, Flutter): **2026.11.19-c** (`lib/cast/cast_service.dart`의 `appVersion`)
-- 상담 PC 모니터(웹, Netlify에 폴더째 끌어다 놓기): **v3.25** (`monitor-web/`)
+- 태블릿 앱(안드로이드 APK, Flutter): **2026.11.19-d** (`lib/cast/cast_service.dart`의 `appVersion`)
+- 상담 PC 모니터(웹, Netlify에 폴더째 끌어다 놓기): **v3.26** (`monitor-web/`)
 - 자동 테스트: 124개 모두 통과 (`flutter test`)
 
 ## 2. 구성
@@ -43,8 +43,8 @@ flutter pub get
 flutter test
 flutter build apk --release   # build/app/outputs/flutter-apk/app-release.apk
 ```
-- PC 모니터: `monitor-web` 폴더를 Netlify에 그대로 올림 (사용자에게는 `monitor-web-v3.xx.zip` 으로 묶어 전달). 새 버전 만들 때 index.html의 버전(3.25)을 올림
-- 버전 올리기: `lib/cast/cast_service.dart`의 `appVersion` + PC `app.js` 안의 "2026.11.19-b 이상" 문구
+- PC 모니터: `monitor-web` 폴더를 Netlify에 그대로 올림 (사용자에게는 `monitor-web-v3.xx.zip` 으로 묶어 전달). 새 버전 만들 때 index.html의 버전(3.26)을 올림
+- 버전 올리기: `lib/cast/cast_service.dart`의 `appVersion` + PC `app.js` 안의 "2026.11.19-d 이상" 문구
 
 ## 6. 주요 파일
 - `lib/simulator/simulator_screen.dart` — 메인 화면(변환·PC 명령 처리 `_onRemoteCmd`·상태 전송 `_pushCast`)
@@ -59,3 +59,4 @@ flutter build apk --release   # build/app/outputs/flutter-apk/app-release.apk
 
 ## 8. 알려진 문제·해결 기록
 - 2026.11.19-b: PC 정밀 매칭에서 "Field platform_ for wz0 not found" → 릴리스 빌드의 코드 이름 줄이기(R8)가 MediaPipe 내부 이름을 바꿔서 생김. `android/app/proguard-rules.pro` 에 MediaPipe·protobuf 보호 규칙 추가 (2026.11.19-c)
+- 2026.11.19-c 에서도 "com.google.mediapipe.framework.Graph" 오류 (Flogger 이름 바뀜) → 릴리스 빌드의 코드 이름 줄이기(R8)를 아예 끔 (`isMinifyEnabled = false`, APK 135MB). 오류 메시지는 원인 사슬 전체를 보여 줌 (2026.11.19-d, PC v3.26 긴 오류 줄바꿈)

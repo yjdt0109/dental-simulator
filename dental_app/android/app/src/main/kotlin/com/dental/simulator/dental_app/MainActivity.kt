@@ -64,7 +64,14 @@ class MainActivity : FlutterActivity() {
                                 }
                                 result.success(out)
                             } catch (e: Throwable) {
-                                result.error("align", e.message ?: e.toString(), null)
+                                var c: Throwable? = e
+                                val parts = mutableListOf<String>()
+                                while (c != null && parts.size < 4) {
+                                    parts.add("${c.javaClass.simpleName}: ${c.message ?: ""}")
+                                    c = c.cause
+                                }
+                                android.util.Log.e("DentalAlign", "align failed", e)
+                                result.error("align", parts.joinToString(" ← "), null)
                             }
                         }
                     }
