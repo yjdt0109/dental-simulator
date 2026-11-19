@@ -241,6 +241,7 @@ class PatientPhoto {
       remember('사진 빼기');
       results = [...results]..removeAt(n - 1);
       if (results.isEmpty) editing = true;
+      basePick = 0;
     } else if (n < 0 && -n <= extras.length) {
       extras.removeAt(-n - 1);
     } else {
@@ -248,6 +249,22 @@ class PatientPhoto {
     }
     sel = [];
     return label;
+  }
+
+  /// 🔁 다시 변환할 때 기준 사진: 목록에서 변환 결과를 누르면 그 결과(번호), 원본을 누르면 0
+  int basePick = 0;
+  int get baseIndex =>
+      basePick > 0 && basePick <= results.length ? basePick : 0;
+  Uint8List get baseBytes => bytesOf(baseIndex);
+
+  /// 목록에서 누른 사진으로 기준 정하기 (불러온 다른 사진은 기준이 안 됨: 구도가 다름)
+  void noteBase(int n) {
+    if (n < 0) return;
+    if (compare.contains(n)) {
+      basePick = n;
+    } else {
+      basePick = compare.where((x) => x > 0).lastOrNull ?? 0;
+    }
   }
 
   /// 같은 내용의 사진이 이미 목록(원본·결과·불러온 사진)에 있는지

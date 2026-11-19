@@ -201,4 +201,34 @@ void main() {
     expect(find.textContaining('2장을 비교 목록에'), findsOneWidget);
     expect(t.takeException(), isNull);
   });
+
+  test('🔁 다시 변환 기준: 목록에서 결과를 누르면 그 결과, 원본을 누르면 원본', () {
+    final p = PatientPhoto(
+      id: 'b',
+      name: '',
+      type: '',
+      time: '',
+      beforeBytes: jpg(10),
+      imageSize: const Size(120, 90),
+    );
+    final r1 = jpg(20), r2 = jpg(30);
+    p.addResult(r1, 'k');
+    p.addResult(r2, 'k');
+    expect(p.baseIndex, 0); // 기본은 원본
+    p.toggleSel(1);
+    p.noteBase(1);
+    expect(p.baseIndex, 1);
+    expect(identical(p.baseBytes, r1), isTrue);
+    p.toggleSel(0);
+    p.noteBase(0);
+    expect(p.baseIndex, 0);
+    p.toggleSel(2);
+    p.noteBase(2);
+    expect(p.baseIndex, 2);
+    p.addExtra(jpg(40), '사진 1');
+    p.noteBase(-1); // 불러온 사진은 기준이 안 됨
+    expect(p.baseIndex, 2);
+    p.removePhoto(2, '2번');
+    expect(p.baseIndex, 0); // 결과를 빼면 원본으로
+  });
 }

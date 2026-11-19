@@ -215,6 +215,7 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
       'undo': p.history.isEmpty ? null : p.history.last.label,
       'redo': p.future.isEmpty ? null : p.future.last.label,
       'notice': _noticeAt == 0 ? null : {'m': _notice, 'at': _noticeAt},
+      'base': p.baseIndex == 0 ? '' : _label(p, p.baseIndex),
       'items': [for (final n in order) _label(p, n)],
       'subs': [for (final n in order) _sub(p, n)],
       'cmp': [for (final n in cmp) order.indexOf(n)],
@@ -1074,6 +1075,7 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
           setState(() {
             _smileView = false;
             p.toggleSel(p.listOrder[v]);
+            p.noteBase(p.listOrder[v]);
           });
         }
         return;
@@ -1335,12 +1337,13 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
         ? p.lines.cervical
         : const <GuideLine>[];
     final eff = _engineNow();
+    final base = p.baseBytes; // 원본 또는 목록에서 고른 변환 결과
     if (eff.engine != Engine.solo) {
       // 2단계 파이프라인: 1단계 FLUX(마진·형태) → 2단계 선택한 엔진(리얼리즘)
       try {
         after = await TwoPassPipeline().run(
           engine: eff.engine,
-          before: p.beforeBytes,
+          before: base,
           lines: p.lines.cervical,
           maskOverride: region,
           fluxPrompt: ClinicalPrompt.fluxPrompt(
@@ -1375,7 +1378,7 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
     if (after == null) {
       try {
         after = await AiService.instance.generateAfter(
-          before: p.beforeBytes,
+          before: base,
           guide: _useGuide ? p.lines.cervical : const [],
           lock: lock,
           prompt: _aiPrompt(extra: fix),
@@ -1387,7 +1390,7 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
     }
     if (region != null && after != null) {
       // 고른 치아 바깥(잇몸·인접 치아·입술)은 원본 픽셀로 100% 되돌림
-      final src = await AiService.decodePhoto(p.beforeBytes);
+      final src = await AiService.decodePhoto(base);
       after = await compute(protectOutside, (src, after, region));
     }
     return (after: after, fail: aiFail, notice: aiNotice, tag: usedTag);
@@ -1396,6 +1399,7 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
   Future<void> _convert() async {
     final p = _cur!, c = _c;
     final useAi = _useAi;
+    final baseN = p.baseIndex; // 0 = 원본, N = N번 결과를 다듬기
     if (!useAi && c.teeth.isEmpty) {
       _toast('치료 부위를 덴탈 차트에서 먼저 선택해 주세요.');
       return;
@@ -1426,7 +1430,7 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
         }
         try {
           final out = await runNoPrepGuard(
-            original: p.beforeBytes,
+            original: p.baseBytes,
             lines: p.hasSam
                 ? contourLines(p.sam)
                 : (_useGuide ? p.lines : const []),
@@ -1468,7 +1472,7 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
         // 기본 방식 (AI 를 끄거나 AI 가 실패했을 때)
         if (p.isUpload) {
           after = await whitenPhoto(
-            p.beforeBytes,
+            p.baseBytes,
             roi: p.roi,
             targetL: shade.targetL,
             targetB: shade.targetB,
@@ -1493,7 +1497,9 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
         p.addResult(
           after!,
           _settingsKey(),
-          engine: usedTag,
+          engine: baseN > 0
+              ? '${usedTag.isEmpty ? '' : '$usedTag · '}$baseN번 기준'
+              : usedTag,
           check: noPrep == null ? '' : noPrep.label,
         );
         p.editing = false;
@@ -2918,6 +2924,7 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
             onTap: () => setState(() {
               _smileView = false; // 고른 사진을 보여 줌
               p.toggleSel(n);
+              p.noteBase(n); // 결과를 누르면 [다시 변환하기] 기준도 그 결과로
             }),
             child: Padding(
               padding: const EdgeInsets.all(5),
@@ -3796,6 +3803,24 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
     );
   }
 
+  /// 🔁 어떤 사진을 기준으로 변환하는지 (목록에서 결과를 누르면 바뀜)
+  Widget _baseLine(PatientPhoto p) {
+    final n = p.baseIndex;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Text(
+        n == 0
+            ? '기준 사진: 원본 (비교 목록에서 변환 결과를 누르면 그 결과를 기준으로 다시 다듬어요)'
+            : '기준 사진: ${_label(p, n)} → 이 결과를 다듬어 새 결과를 만들어요 (원본으로 하려면 목록에서 원본을 누르세요)',
+        style: TextStyle(
+          fontSize: 12.5,
+          fontWeight: n == 0 ? FontWeight.w500 : FontWeight.w800,
+          color: n == 0 ? AppColors.gray500 : AppColors.blueDeep,
+        ),
+      ),
+    );
+  }
+
   Widget _convertBox(bool locked) {
     final c = _c, converted = _converted, stale = _stale;
     final ready = !converted || stale;
@@ -3834,6 +3859,7 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
             ],
           ),
           const SizedBox(height: 6),
+          _baseLine(_cur!),
           _aiRow(locked),
           Row(
             children: [

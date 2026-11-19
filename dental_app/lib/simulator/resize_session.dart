@@ -116,8 +116,9 @@ class ResizeSession {
     final b = teeth[i].box;
     final size = s == GrowSide.left || s == GrowSide.right ? b.width : b.height;
     if (noPrep && isMargin(i, s)) return false; // 무삭제: 마진 고정
-    // 치아 윤곽만 키우는 방식이라 줄이기는 없음 (0 = 원래 크기)
-    v = v.clamp(0.0, size * 0.5);
+    // 줄이기는 치아 크기의 30% 까지 (줄어든 자리는 치아 바깥 배경으로 채움), 키우기는 50% 까지
+    // 무삭제 라미네이트는 치아를 깎지 않으므로 줄이기 없음
+    v = v.clamp(noPrep ? 0.0 : -size * 0.3, size * 0.5);
     final g = grows[i];
     if (get(g, s) == v) return false;
     grows[i] = switch (s) {

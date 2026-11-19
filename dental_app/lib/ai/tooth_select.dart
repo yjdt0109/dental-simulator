@@ -709,6 +709,57 @@ img.Image scaleToothMasked(
   final kx = box.width / math.max(1e-6, nx1 - nx0);
   final ky = box.height / math.max(1e-6, ny1 - ny0);
   final mx = soft.width / src.width, my = soft.height / src.height;
+  // ➖ 줄이기(음수): 원래 치아 자리를 먼저 치아 바깥 배경으로 채움
+  //   절단끝을 줄이면 → 치아 아래(입 안 어두운 곳·아래 치아)를 끌어올림
+  //   잇몸 쪽을 줄이면 → 위 잇몸을 끌어내림 / 옆을 줄이면 → 옆 사이 공간을 끌어옴
+  if (left < 0 || right < 0 || up < 0 || down < 0) {
+    final cx = box.center.dx, cy = box.center.dy;
+    final bx0 = math.max(0, (box.left - 3).floor()),
+        bx1 = math.min(src.width - 1, (box.right + 3).ceil());
+    final by0 = math.max(0, (box.top - 3).floor()),
+        by1 = math.min(src.height - 1, (box.bottom + 3).ceil());
+    for (var y = by0; y <= by1; y++) {
+      for (var x = bx0; x <= bx1; x++) {
+        final a0 =
+            soft
+                .getPixelInterpolate(
+                  x * mx,
+                  y * my,
+                  interpolation: img.Interpolation.linear,
+                )
+                .r /
+            255.0;
+        if (a0 <= 0.01) continue;
+        double fx = x.toDouble(), fy = y.toDouble();
+        if (down < 0 && y >= cy) {
+          fy = y - down + 2; // 아래 배경 (입 안·아래 치아)을 끌어올림
+        } else if (up < 0 && y < cy) {
+          fy = y + up - 2; // 위 잇몸을 끌어내림
+        } else if (left < 0 && x < cx) {
+          fx = x + left - 2;
+        } else if (right < 0 && x >= cx) {
+          fx = x - right + 2;
+        } else {
+          continue;
+        }
+        fx = fx.clamp(0, src.width - 1).toDouble();
+        fy = fy.clamp(0, src.height - 1).toDouble();
+        final c = src.getPixelInterpolate(
+          fx,
+          fy,
+          interpolation: img.Interpolation.linear,
+        );
+        final o = out.getPixel(x, y);
+        out.setPixelRgb(
+          x,
+          y,
+          (o.r * (1 - a0) + c.r * a0).round(),
+          (o.g * (1 - a0) + c.g * a0).round(),
+          (o.b * (1 - a0) + c.b * a0).round(),
+        );
+      }
+    }
+  }
   final xs0 = math.max(0, (nx0 - 3).floor()),
       xs1 = math.min(src.width - 1, (nx1 + 3).ceil());
   final ys0 = math.max(0, (ny0 - 3).floor()),

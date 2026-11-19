@@ -425,7 +425,9 @@ class _ToothResizeScreenState extends State<ToothResizeScreen> {
             ),
             IconButton.outlined(
               tooltip: '$name 줄이기',
-              onPressed: locked || pct <= 0 ? null : () => _step(s, -1),
+              onPressed: locked || pct <= (_rs.noPrep ? 0 : -30)
+                  ? null
+                  : () => _step(s, -1),
               icon: const Icon(Icons.remove),
             ),
             SizedBox(
