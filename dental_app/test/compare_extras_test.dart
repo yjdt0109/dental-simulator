@@ -71,6 +71,21 @@ void main() {
     p.noteSmile();
     expect(p.extras.length, 3); // s2 는 이미 있음 → 미소 미리보기만 추가
     expect(p.extras.last.label, '😊 미소 미리보기 1');
+    // 누르면 짝과 자동 비교
+    final sa = p.extras.last.bytes;
+    final nSa = -p.extras.length;
+    p.pick(nSa);
+    expect(p.compare, [-2, nSa]); // 미소 미리보기 ↔ 그 미소 사진(s2)
+    expect(identical(p.bytesOf(p.compare[0]), s2), isTrue);
+    expect(identical(p.bytesOf(p.compare[1]), sa), isTrue);
+    expect(p.sameShot(-2, nSa), isTrue);
+    p.pick(1);
+    expect(p.compare, [0, 1]); // 변환 결과 ↔ 원본
+    p.pick(1);
+    expect(p.compare, [1]); // 비교 중인 걸 다시 누르면 그 사진만
+    p.pick(-1);
+    expect(p.compare, [1, -1]); // 한 장 보일 때 다른 사진 → 두 장 (다른 촬영)
+    expect(p.sameShot(1, -1), isFalse);
   });
 
   testWidgets('첫 화면(변환 전): 이전 변환 불러오기·미소 미리보기 버튼, 미소 사진 여러 장 → 브리핑에서 골라 비교', (
@@ -147,6 +162,17 @@ void main() {
       await Future<void>.delayed(const Duration(milliseconds: 200));
     });
     await _settle(t);
+    // 미소 1 ↔ 기록 미소 미리보기는 다른 촬영 → 손잡이 대신 위아래로 나란히
+    expect(find.byType(SliderCompare), findsNothing);
+    expect(find.byType(StackedCompare), findsOneWidget);
+    // 기록 미소 미리보기만 → 다시 누르면 짝(기록 미소)과 손잡이 비교
+    for (var i = 0; i < 2; i++) {
+      await t.runAsync(() async {
+        CastService.instance.onRemoteCmd?.call({'t': 'cmpToggle', 'v': 4});
+        await Future<void>.delayed(const Duration(milliseconds: 200));
+      });
+      await _settle(t);
+    }
     expect(find.byType(SliderCompare), findsOneWidget);
     expect(find.text('사진 추가'), findsOneWidget);
     expect(t.takeException(), isNull);
@@ -173,8 +199,14 @@ void main() {
         home: SmilePreviewScreen(
           photo: p,
           pickRecords: () async => [
-            (bytes: a, label: '박지은 원본', sub: '환자 기록', smile: false),
-            (bytes: b, label: '😊 박지은 미소', sub: '환자 기록', smile: true),
+            (bytes: a, label: '박지은 원본', sub: '환자 기록', smile: false, pair: null),
+            (
+              bytes: b,
+              label: '😊 박지은 미소',
+              sub: '환자 기록',
+              smile: true,
+              pair: null,
+            ),
           ],
         ),
       ),

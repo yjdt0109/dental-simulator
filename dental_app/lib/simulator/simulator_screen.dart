@@ -261,7 +261,11 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
             ],
           },
       ],
-      'view': !converted ? 'edit' : (_briefing ? 'slider' : 'stack'),
+      'view': !converted
+          ? 'edit'
+          : (_briefing && (cmp.length < 2 || p.sameShot(cmp[0], cmp[1]))
+                ? 'slider'
+                : 'stack'),
       'briefing': _briefing,
       'pos': double.parse(_pos.toStringAsFixed(3)),
       'name': c.name.trim(),
@@ -960,7 +964,7 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
         if (v is int && v >= 0 && v < p.listOrder.length) {
           setState(() {
             _smileView = false;
-            p.toggleSel(p.listOrder[v]);
+            p.pick(p.listOrder[v]);
           });
         }
         return;
@@ -1974,6 +1978,17 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
         afterSub: _sub(p, p.compare[1]),
         afterOverlay: _overlayFor(p, p.compare[1]),
       ),
+      // 다른 촬영끼리(개구기 ↔ 미소 등)는 겹치면 어긋나므로 위아래로 나란히
+      _ViewMode.slider when !p.sameShot(p.compare[0], p.compare[1]) =>
+        StackedCompare(
+          before: p.bytesOf(p.compare[0]),
+          after: p.bytesOf(p.compare[1]),
+          fit: BoxFit.contain,
+          beforeTitle: _label(p, p.compare[0]),
+          beforeSub: _sub(p, p.compare[0]),
+          afterTitle: _label(p, p.compare[1]),
+          afterSub: _sub(p, p.compare[1]),
+        ),
       _ViewMode.slider => SliderCompare(
         before: p.bytesOf(p.compare[0]),
         after: p.bytesOf(p.compare[1]),
@@ -2325,7 +2340,7 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
     final sub = '환자 기록 · ${r.dayText} ${r.time}';
     p.addExtra(f.smile!, '😊 $who 미소', sub: sub);
     if (f.smileAfter != null) {
-      p.addExtra(f.smileAfter!, '😊 $who 미소 미리보기', sub: sub);
+      p.addExtra(f.smileAfter!, '😊 $who 미소 미리보기', sub: sub, pair: f.smile);
     }
     await setSmile(p, f.smile!);
     _smileMsg = '환자 기록($who ${r.dayText})의 미소 사진을 불러왔어요 · 왼쪽 비교 목록에도 들어갔어요';
@@ -2371,7 +2386,7 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
       final got = await pickRecordPhotos(context);
       if (got == null) return;
       for (final g in got) {
-        p.addExtra(g.bytes, g.label, sub: g.sub);
+        p.addExtra(g.bytes, g.label, sub: g.sub, pair: g.pair);
         added++;
       }
     } else {
@@ -2782,7 +2797,7 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
           child: InkWell(
             onTap: () => setState(() {
               _smileView = false; // 고른 사진을 보여 줌
-              p.toggleSel(n);
+              p.pick(n); // 짝(원본·미소 사진)이 있으면 자동으로 함께
             }),
             child: Padding(
               padding: const EdgeInsets.all(5),
@@ -2843,7 +2858,7 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
           const Padding(
             padding: EdgeInsets.only(bottom: 6),
             child: Text(
-              '비교할 사진\n(1~2장 체크)',
+              '비교할 사진\n(누르면 짝과 비교)',
               style: TextStyle(
                 fontSize: 11,
                 color: AppColors.gray500,

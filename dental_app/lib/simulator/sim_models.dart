@@ -226,11 +226,16 @@ class PatientPhoto {
   final List<ExtraPhoto> extras = [];
 
   /// 같은 사진이 이미 있으면 그 번호, 아니면 새로 넣고 그 번호 (-1, -2 …)
-  int addExtra(Uint8List bytes, String label, {String sub = ''}) {
+  int addExtra(
+    Uint8List bytes,
+    String label, {
+    String sub = '',
+    Uint8List? pair,
+  }) {
     for (var i = 0; i < extras.length; i++) {
       if (identical(extras[i].bytes, bytes)) return -(i + 1);
     }
-    extras.add(ExtraPhoto(bytes, label, sub: sub));
+    extras.add(ExtraPhoto(bytes, label, sub: sub, pair: pair));
     return -extras.length;
   }
 
@@ -248,6 +253,7 @@ class PatientPhoto {
         sa,
         '😊 미소 미리보기 $k',
         sub: '미소 미리보기${smileFrom.isEmpty ? '' : ' · $smileFrom'}',
+        pair: sm,
       );
     }
   }
@@ -279,6 +285,43 @@ class PatientPhoto {
       : n <= 0 || n > results.length
       ? beforeBytes
       : results[n - 1].bytes;
+
+  /// 같은 촬영의 짝: 변환 결과 → 원본, 미소 미리보기 → 그 미소 사진 (목록에 있을 때만)
+  int? partnerOf(int n) {
+    if (n > 0 && n <= results.length) return 0;
+    if (n >= 0 || -n > extras.length) return null;
+    final pr = extras[-n - 1].pair;
+    if (pr == null) return null;
+    for (final m in listOrder) {
+      if (m != n && identical(bytesOf(m), pr)) return m;
+    }
+    return null;
+  }
+
+  /// 두 장이 같은 촬영인지 (겹쳐 보기 손잡이가 맞는지). 다르면 나란히 보여 줌
+  bool sameShot(int a, int b) =>
+      (a >= 0 && b >= 0) || partnerOf(a) == b || partnerOf(b) == a;
+
+  /// 브리핑 목록에서 누르기: 짝이 있으면 짝과 바로 비교, 없으면 그 사진만 →
+  /// 한 장만 보일 때 다른 사진을 누르면 두 장 비교, 비교 중인 사진을 다시 누르면 그 사진만
+  void pick(int n) {
+    if (!_valid(n)) return;
+    final cur = compare;
+    final mate = partnerOf(n);
+    if (cur.length == 2 && cur.contains(n)) {
+      sel = [n];
+    } else if (mate != null &&
+        !(sel.isNotEmpty &&
+            cur.length == 1 &&
+            cur.first != mate &&
+            cur.first != n)) {
+      sel = [mate, n];
+    } else if (cur.length == 1 && cur.first != n && sel.isNotEmpty) {
+      sel = [cur.first, n];
+    } else {
+      sel = [n];
+    }
+  }
 
   /// 비교 목록에서 사진 체크/해제 (최대 2장, 3번째를 고르면 가장 먼저 고른 것이 빠짐)
   void toggleSel(int n) {
@@ -368,8 +411,9 @@ class PatientPhoto {
 
 /// 비교 목록에 더 불러온 사진 한 장
 class ExtraPhoto {
-  const ExtraPhoto(this.bytes, this.label, {this.sub = ''});
+  const ExtraPhoto(this.bytes, this.label, {this.sub = '', this.pair});
   final Uint8List bytes;
+  final Uint8List? pair; // 같은 촬영의 짝 (미소 미리보기 → 미소 사진)
   final String label; // 예: 😊 미소 1
   final String sub; // 예: 치료 전 / 미소 미리보기 / 환자 기록
 }

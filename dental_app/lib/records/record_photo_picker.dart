@@ -5,7 +5,13 @@ import '../app_theme.dart';
 import 'records.dart';
 
 /// 환자 기록에서 고른 사진 한 장
-typedef PickedPhoto = ({Uint8List bytes, String label, String sub, bool smile});
+typedef PickedPhoto = ({
+  Uint8List bytes,
+  String label,
+  String sub,
+  bool smile,
+  Uint8List? pair, // 같은 촬영의 짝 (결과 → 원본, 미소 미리보기 → 미소)
+});
 
 /// 🗂 환자 기록에서 사진 여러 장 고르기 (누른 차례대로 번호가 붙고, 그 차례대로 돌려줌).
 /// [smileFirst]: 미소 사진을 먼저 보여 줌 (미소 미리보기에서 열 때)
@@ -66,6 +72,7 @@ class _RecordPhotoPickerState extends State<RecordPhotoPicker> {
           label: '😊 $who 미소',
           sub: '환자 기록 · $day',
           smile: true,
+          pair: null,
         ),
       if (f?.smileAfter != null)
         (
@@ -73,11 +80,18 @@ class _RecordPhotoPickerState extends State<RecordPhotoPicker> {
           label: '😊 $who 미소 미리보기',
           sub: '환자 기록 · $day',
           smile: false,
+          pair: f.smile,
         ),
     ];
     final rest = <PickedPhoto>[
       if (f != null)
-        (bytes: f.before, label: '$who 원본', sub: '환자 기록 · $day', smile: false),
+        (
+          bytes: f.before,
+          label: '$who 원본',
+          sub: '환자 기록 · $day',
+          smile: false,
+          pair: null,
+        ),
       if (f != null)
         for (var i = 0; i < f.results.length; i++)
           (
@@ -85,6 +99,7 @@ class _RecordPhotoPickerState extends State<RecordPhotoPicker> {
             label: r.shots.length > i ? r.shots[i].label : '$who ${i + 1}번',
             sub: '환자 기록 · $day',
             smile: false,
+            pair: f.before,
           ),
     ];
     setState(() {

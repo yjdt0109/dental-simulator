@@ -361,7 +361,7 @@ class _SmilePreviewScreenState extends State<SmilePreviewScreen> {
         : await pickRecordPhotos(context, smileFirst: true);
     if (got == null || got.isEmpty || !mounted) return;
     for (final g in got) {
-      p.addExtra(g.bytes, g.label, sub: g.sub);
+      p.addExtra(g.bytes, g.label, sub: g.sub, pair: g.pair);
     }
     final first = got.where((g) => g.smile).firstOrNull ?? got.first;
     await _useSmile(first.bytes);

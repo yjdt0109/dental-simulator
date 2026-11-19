@@ -86,8 +86,10 @@ void main() {
     // 브리핑: 왼쪽 목록에서 원본·1번·2번 고르기
     send({'t': 'briefing', 'v': true});
     await t.pump();
-    expect(find.text('비교할 사진\n(1~2장 체크)'), findsOneWidget);
-    send({'t': 'cmpToggle', 'v': 1}); // 원본 빠지고 1번 vs 2번
+    expect(find.text('비교할 사진\n(누르면 짝과 비교)'), findsOneWidget);
+    send({'t': 'cmpToggle', 'v': 2}); // 비교 중인 2번을 누르면 2번만
+    await t.pump();
+    send({'t': 'cmpToggle', 'v': 1}); // 한 장일 때 1번 → 1번 vs 2번
     await t.pump();
     expect(find.byType(SliderCompare), findsOneWidget);
     final sc = t.widget<SliderCompare>(find.byType(SliderCompare));
