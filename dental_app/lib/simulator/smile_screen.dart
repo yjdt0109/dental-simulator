@@ -5,6 +5,7 @@ import 'package:image_picker/image_picker.dart';
 import '../ai/ai_service.dart';
 import '../ai/pipeline.dart' show PipelineError;
 import '../ai/smile.dart';
+import '../ai/smile_match.dart';
 import '../app_theme.dart';
 import '../privacy/mouth_finder.dart';
 import 'compare_viewer.dart';
@@ -19,6 +20,7 @@ class SmilePreviewScreen extends StatefulWidget {
     required this.afterLabel,
     this.pick,
     this.make,
+    this.matcher,
   });
   final PatientPhoto photo;
   final Uint8List after; // 입힐 변환 결과
@@ -33,6 +35,14 @@ class SmilePreviewScreen extends StatefulWidget {
   )?
   make;
 
+  /// 시험용: 보철 사진 정밀 매칭 체이닝 바꿔 끼우기
+  final Future<MatchResult> Function(
+    Uint8List smile,
+    Uint8List prosth,
+    void Function(String) onStep,
+  )?
+  matcher;
+
   @override
   State<SmilePreviewScreen> createState() => _SmilePreviewScreenState();
 }
@@ -42,6 +52,267 @@ class _SmilePreviewScreenState extends State<SmilePreviewScreen> {
   bool _making = false;
   String? _msg;
   double _pos = 0.5;
+
+  // 🦷 보철 사진 정밀 매칭
+  Uint8List? _prosth; // 2번: 개구기 보철 사진
+  String _prosthLabel = '';
+  bool _matching = false;
+  String _matchStep = '';
+  MatchResult? _match;
+  int _show = 3; // 1 정렬 합성 · 2 FLUX 1차 · 3 최종
+
+  Future<void> _pickProsth(ImageSource src) async {
+    Uint8List? bytes;
+    if (widget.pick != null) {
+      bytes = await widget.pick!(src);
+    } else {
+      final f = await ImagePicker().pickImage(
+        source: src,
+        maxWidth: 2400,
+        maxHeight: 2400,
+        imageQuality: 92,
+      );
+      bytes = await f?.readAsBytes();
+    }
+    if (bytes == null || !mounted) return;
+    setState(() {
+      _prosth = bytes;
+      _prosthLabel = '보철 사진';
+      _match = null;
+    });
+  }
+
+  Future<void> _runMatch() async {
+    final smile = p.smile, prosth = _prosth;
+    if (smile == null || prosth == null || _matching) return;
+    setState(() {
+      _matching = true;
+      _match = null;
+      _matchStep = '시작합니다…';
+    });
+    void step(String m) {
+      if (mounted) setState(() => _matchStep = m);
+    }
+
+    try {
+      final r = widget.matcher != null
+          ? await widget.matcher!(smile, prosth, step)
+          : await matchProsthesis(smile: smile, prosth: prosth, onStep: step);
+      if (!mounted) return;
+      setState(() {
+        _match = r;
+        _show = 3;
+        p.smileAfter = r.finalImage;
+        p.smileFrom = '보철 사진 정밀 매칭';
+        _pos = 0.5;
+        _matchStep =
+            '완성! ${r.align.summary}${r.notes.isEmpty ? '' : '\n${r.notes.join('\n')}'}';
+      });
+    } on PipelineError catch (e) {
+      setState(() => _matchStep = '⚠ ${e.message}');
+    } on AiError catch (e) {
+      setState(() => _matchStep = '⚠ ${e.message}');
+    } catch (e) {
+      setState(() => _matchStep = '⚠ 정밀 매칭에 실패했습니다 ($e)');
+    } finally {
+      if (mounted) setState(() => _matching = false);
+    }
+  }
+
+  Widget _matchCard() {
+    final can =
+        p.smile != null &&
+        _prosth != null &&
+        !_matching &&
+        (DentalAligner.supported || widget.matcher != null);
+    final m = _match;
+    Widget thumb(int n, String label, Uint8List? b) => Expanded(
+      child: InkWell(
+        onTap: b == null
+            ? null
+            : () => setState(() {
+                _show = n;
+                p.smileAfter = b;
+              }),
+        child: Column(
+          children: [
+            AspectRatio(
+              aspectRatio: 4 / 3,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: const Color(0xFF0D1622),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: _show == n
+                        ? const Color(0xFF00A88F)
+                        : Colors.transparent,
+                    width: 2,
+                  ),
+                ),
+                clipBehavior: Clip.antiAlias,
+                child: b == null ? null : Image.memory(b, fit: BoxFit.contain),
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(label, style: const TextStyle(fontSize: 11.5)),
+          ],
+        ),
+      ),
+    );
+    return Material(
+      color: Colors.white,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+        side: const BorderSide(color: AppColors.gray200),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Text(
+              '🦷 보철 사진 정밀 매칭 (얼굴 특징점)',
+              style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
+            ),
+            const SizedBox(height: 4),
+            const Text(
+              '개구기로 찍은 보철 사진(2번)의 치아를 미소 사진(1번)의 입 안쪽에 맞춰 넣어요. '
+              '기기 안에서 눈 중심·코끝으로 두 사진을 정렬한 뒤 → FLUX가 빈 곳·경계를 채우고 → 나노바나나가 조명·그림자를 맞춥니다.',
+              style: TextStyle(
+                fontSize: 12,
+                color: AppColors.gray500,
+                height: 1.45,
+              ),
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                SizedBox(
+                  width: 96,
+                  height: 72,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: ColoredBox(
+                      color: const Color(0xFF0D1622),
+                      child: _prosth == null
+                          ? const Center(
+                              child: Text(
+                                '2번 사진',
+                                style: TextStyle(
+                                  color: Colors.white54,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            )
+                          : Image.memory(_prosth!, fit: BoxFit.cover),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: [
+                      OutlinedButton(
+                        onPressed: _matching
+                            ? null
+                            : () => _pickProsth(ImageSource.gallery),
+                        child: const Text('보철 사진 고르기'),
+                      ),
+                      OutlinedButton(
+                        onPressed: _matching
+                            ? null
+                            : () => _pickProsth(ImageSource.camera),
+                        child: const Text('촬영'),
+                      ),
+                      OutlinedButton(
+                        onPressed: _matching
+                            ? null
+                            : () => setState(() {
+                                _prosth = widget.after;
+                                _prosthLabel = widget.afterLabel;
+                                _match = null;
+                              }),
+                        child: Text('지금 결과 쓰기 (${widget.afterLabel})'),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            if (_prosthLabel.isNotEmpty) ...[
+              const SizedBox(height: 4),
+              Text(
+                '2번: $_prosthLabel',
+                style: const TextStyle(fontSize: 12, color: AppColors.gray500),
+              ),
+            ],
+            const SizedBox(height: 10),
+            FilledButton.icon(
+              style: FilledButton.styleFrom(minimumSize: const Size(0, 48)),
+              onPressed: can ? _runMatch : null,
+              icon: _matching
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                  : const Icon(Icons.center_focus_strong_outlined),
+              label: const Text('🎯 정밀 매칭 합성 시작'),
+            ),
+            if (!DentalAligner.supported && widget.matcher == null)
+              const Padding(
+                padding: EdgeInsets.only(top: 6),
+                child: Text(
+                  '안드로이드 태블릿에서만 쓸 수 있어요 (얼굴 특징점을 기기 안에서 찾습니다).',
+                  style: TextStyle(fontSize: 12, color: AppColors.error),
+                ),
+              ),
+            if (p.smile == null)
+              const Padding(
+                padding: EdgeInsets.only(top: 6),
+                child: Text(
+                  '먼저 위에서 1번 미소 사진을 올려 주세요.',
+                  style: TextStyle(fontSize: 12),
+                ),
+              ),
+            if (_matchStep.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Text(
+                _matchStep,
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.blueDeep,
+                ),
+              ),
+            ],
+            if (m != null) ...[
+              const SizedBox(height: 10),
+              const Text(
+                '단계별 결과 (눌러서 아래 비교에 쓰기)',
+                style: TextStyle(fontSize: 12.5),
+              ),
+              const SizedBox(height: 6),
+              Row(
+                children: [
+                  thumb(1, '① 정렬 합성', m.composite),
+                  const SizedBox(width: 6),
+                  thumb(2, '② FLUX 1차', m.stage1),
+                  const SizedBox(width: 6),
+                  thumb(3, '③ 최종', m.finalImage),
+                ],
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
 
   Future<void> _pick(ImageSource src) async {
     Uint8List? bytes;
@@ -275,6 +546,8 @@ class _SmilePreviewScreenState extends State<SmilePreviewScreen> {
             const SizedBox(height: 12),
             panel,
           ],
+          const SizedBox(height: 14),
+          _matchCard(),
           if (result != null) ...[
             const SizedBox(height: 14),
             const Text(

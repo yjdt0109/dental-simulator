@@ -29,6 +29,11 @@ android {
         versionName = flutter.versionName
     }
 
+    // MediaPipe 모델(.task)은 압축하지 않아야 바로 읽을 수 있음
+    androidResources {
+        noCompress.add("task")
+    }
+
     buildTypes {
         release {
             // TODO: Add your own signing config for the release build.
@@ -46,4 +51,10 @@ kotlin {
 
 flutter {
     source = "../.."
+}
+
+dependencies {
+    // 😊 미소·보철 사진 정밀 매칭: 얼굴 특징점 478개 (기기 안에서 처리)
+    implementation("com.google.mediapipe:tasks-vision:0.10.26")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
 }
