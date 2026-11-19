@@ -201,7 +201,7 @@ void main() {
       await RecordPhotoLoader.run(rec.id, 'before.jpg');
     });
     await _settle(t);
-    expect(msg, contains('비교 목록에 불러왔습니다'));
+    expect(msg, contains('목록에 불러왔습니다'));
     await t.runAsync(() async {
       CastService.instance.onRemoteCmd?.call({'t': 'briefing', 'v': true});
       await Future<void>.delayed(const Duration(milliseconds: 200));

@@ -214,6 +214,7 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
       'aiPrompt': _useAi ? _aiPrompt() : '',
       'undo': p.history.isEmpty ? null : p.history.last.label,
       'redo': p.future.isEmpty ? null : p.future.last.label,
+      'notice': _noticeAt == 0 ? null : {'m': _notice, 'at': _noticeAt},
       'items': [for (final n in order) _label(p, n)],
       'subs': [for (final n in order) _sub(p, n)],
       'cmp': [for (final n in cmp) order.indexOf(n)],
@@ -951,7 +952,7 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
     _smilePublish(target);
     final msg = again
         ? '🗂 $what 은(는) 이미 목록에 있습니다'
-        : '🗂 $what 을(를) 비교 목록에 불러왔습니다 · 이어서 다른 사진도 한 장씩 불러올 수 있어요';
+        : '🗂 $what 을(를) 왼쪽 \'비교할 사진\' 목록에 불러왔습니다${_briefing ? '' : ' ([환자 브리핑 모드]에서 보여요)'} · 다른 사진도 한 장씩 불러올 수 있어요';
     _toast(msg);
     return msg;
   }
@@ -1708,8 +1709,16 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
     _toast('${p.name} 님의 상담 내용을 초기화했습니다.');
   }
 
+  // PC 에도 같은 알림을 띄움 (불러오기·빼기 등이 됐는지 PC 에서도 보이게)
+  String _notice = '';
+  int _noticeAt = 0;
+
   void _toast(String msg) {
     if (!mounted) return;
+    setState(() {
+      _notice = msg;
+      _noticeAt = DateTime.now().millisecondsSinceEpoch;
+    });
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(
