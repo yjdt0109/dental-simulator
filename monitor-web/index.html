@@ -1,0 +1,379 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>상담 모니터 · B&amp;A 치과 시뮬레이터</title>
+<meta name="theme-color" content="#0066CC">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@500;600;700&family=Noto+Sans+KR:wght@400;500;700;800&display=swap">
+<link rel="stylesheet" href="style.css?v=3.24">
+</head>
+<body>
+<header class="bar">
+  <div class="logo" aria-hidden="true">
+    <svg width="22" height="22" viewBox="0 0 100 100"><path d="M32 24C18 24 17 42 22 52C27 62 28 80 36 80C43 80 42 62 50 62C58 62 57 80 64 80C72 80 73 62 78 52C83 42 82 24 68 24C60 24 56 29 50 29C44 29 40 24 32 24Z" fill="none" stroke="#fff" stroke-width="6" stroke-linejoin="round"/><line x1="50" y1="14" x2="50" y2="88" stroke="#fff" stroke-width="5" stroke-linecap="round"/></svg>
+  </div>
+  <div class="brand"><b>상담 모니터 <span class="ver">v3.24</span></b><small id="sub">B&amp;A 치과 시뮬레이터</small></div>
+  <select id="roomName" aria-label="상담실 이름">
+    <option>상담실 1</option><option>상담실 2</option><option>상담실 3</option><option>상담실 4</option><option>원장실</option><option>대기실 TV</option>
+  </select>
+  <span class="status" id="status"><i></i><span>연결 중</span></span>
+  <button class="btn" id="qaBtn" type="button" title="태블릿의 자동 QA 에이전트를 PC 에서 실행">🤖 자동 QA</button>
+  <button class="btn" id="recBtn" type="button" title="태블릿에 저장된 환자 기록 (날짜 › 환자이름)">🗂 환자 기록</button>
+  <button class="btn" id="archBtn" type="button" title="태블릿에 저장된 프롬프트 보관함 보기">📚 보관함</button>
+  <button class="btn" id="panelBtn" type="button" aria-pressed="true" title="오른쪽 조작 패널 보이기/숨기기">⚙ 조작 패널</button>
+  <button class="btn" id="pairBtn" type="button" title="다른 태블릿을 연결할 때">QR 보기</button>
+  <button class="btn" id="fullBtn" type="button">⛶ 전체 화면</button>
+</header>
+
+<main>
+  <!-- 1) 처음 연결: QR -->
+  <section class="screen center" id="pairScreen" hidden>
+    <div class="pair-card">
+      <div class="qr" id="qr" aria-label="태블릿 연결용 QR 코드"></div>
+      <div class="pair-side">
+        <span class="chip" id="pairRoom">상담실 1</span>
+        <h1>태블릿 앱에서 QR을 스캔해 주세요</h1>
+        <p class="lost" id="pairLost" hidden>태블릿 연결이 끊겼습니다. 다시 QR을 스캔해 주세요.</p>
+        <p>앱 위쪽 <b>[📺 큰 화면 연결] → [QR 코드 스캔하기]</b>를 누르고 이 QR을 비추면 바로 연결됩니다.<br>보안을 위해 <b>자동 연결은 하지 않아요</b>. 상담 모니터를 열 때마다 새 QR로 연결합니다.</p>
+        <div class="code"><small>QR이 안 되면 앱에서 이 숫자를 입력</small><b id="code">····</b><small id="codeExp"></small></div>
+        <button class="btn link" id="closePair" type="button" hidden>← 상담 화면으로</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- 2) 태블릿 대기 -->
+  <section class="screen center" id="standbyScreen" hidden>
+    <div class="standby">
+      <div class="big-logo" aria-hidden="true">
+        <svg width="64" height="64" viewBox="0 0 100 100"><path d="M32 24C18 24 17 42 22 52C27 62 28 80 36 80C43 80 42 62 50 62C58 62 57 80 64 80C72 80 73 62 78 52C83 42 82 24 68 24C60 24 56 29 50 29C44 29 40 24 32 24Z" fill="none" stroke="#fff" stroke-width="5.5" stroke-linejoin="round"/><line x1="50" y1="14" x2="50" y2="88" stroke="#fff" stroke-width="4" stroke-linecap="round"/></svg>
+      </div>
+      <h1 id="standbyTitle">상담 화면 준비 중</h1>
+      <p id="standbyText">태블릿에서 앱을 열면 자동으로 연결됩니다.</p>
+    </div>
+  </section>
+
+  <!-- 3) 상담 화면: 왼쪽 사진, 오른쪽 조작 패널 -->
+  <section class="screen work" id="workScreen" hidden>
+    <div class="work-main">
+      <div class="view-area">
+        <!-- 원본 + 변환 결과 목록: 체크해서 비교할 사진 고르기 -->
+        <div class="picker" id="picker" hidden>
+          <small>비교할 사진<br>(1~2장 체크)</small>
+          <div id="pickList"></div>
+        </div>
+        <!-- Before 만 (변환 전) + 서비컬 라인 그리기 -->
+        <div class="single" id="single">
+          <div class="zw"><img id="singleImg" alt="Before 치료 전" draggable="false"><canvas id="lineCanvas" aria-label="서비컬 라인 그리기"></canvas></div>
+          <div class="lbl l" id="lblSingle"><b>원본</b><span>치료 전</span></div>
+          <div class="line-tools sam-tools" id="samTools" hidden>
+            <button type="button" id="samTool" class="sam" aria-pressed="false" title="🪄 탭 한 번 자동 선택 (SAM): 치아를 클릭하면 윤곽을 자동으로 찾아요 (다시 클릭하면 빠짐)">🪄 탭 한 번 자동 선택</button>
+            <button type="button" id="samMarkTool" class="mark" aria-pressed="false" title="📍 치아별 기준점(초록 = 잇몸 꼭대기, 노랑 = 절단끝)을 마우스로 끌어 옮기기">📍 기준점</button>
+            <button type="button" id="samUndo" title="마지막 선택 취소">↶ 선택 취소</button>
+            <button type="button" id="samClear" title="선택 초기화">🗑 선택 초기화</button>
+            <span class="sam-n" id="samN"></span>
+          </div>
+          <div class="line-tools" id="lineTools" hidden>
+            <button type="button" id="toolUpper" class="up" aria-pressed="true">〰 상악선</button>
+            <button type="button" id="toolLower" class="lo" aria-pressed="false">〰 하악선</button>
+            <button type="button" id="toolIncisal" class="in" aria-pressed="false" hidden title="무삭제 라미네이트: 앞니 끝선 (이보다 짧아지지 않게 보호)">〰 절단선</button>
+            <button type="button" id="incisalAuto" class="snap" hidden title="서비컬 라인 아래에서 앞니 끝선을 자동으로 찾아요">🦷 절단선 자동 찾기</button>
+            <button type="button" id="toolEraser" aria-pressed="false" title="선만 지워요 (사진은 그대로)">🧽 지우개</button>
+            <button type="button" id="lineSmooth" class="snap" title="다 그린 뒤 누르면 손떨림을 부드럽게 펴고 끊긴 곳을 이어 줘요 (그린 자리에서 크게 벗어나지 않음)">✨ 선 다듬기</button>
+            <button type="button" id="lineUndo" title="마지막 변경(그리기·지우개·다듬기·모두 지움) 취소">↶ 되돌리기</button>
+            <button type="button" id="lineClear">🗑 모두 지움</button>
+          </div>
+        </div>
+        <!-- 겹쳐 보기 (손잡이) -->
+        <div class="stage" id="stage" tabindex="0" role="slider" aria-label="Before After 비교 손잡이 (마우스로 끌거나 ← → 키)" hidden>
+          <div class="zw"><img id="afterImg" alt="After 시뮬레이션" draggable="false"></div>
+          <div class="clip" id="beforeClip"><div class="zw"><img id="beforeImg" alt="Before 치료 전" draggable="false"></div></div>
+          <div class="lbl l" id="lblL"><b>원본</b><span>치료 전</span></div>
+          <div class="lbl r" id="lblR"><b>1번</b><span>시뮬레이션</span></div>
+          <div class="divider" id="divider"><div class="knob">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l-6 6 6 6M15 6l6 6-6 6"/></svg>
+          </div></div>
+        </div>
+        <!-- 위아래 보기 -->
+        <div class="stack" id="stack" hidden>
+          <div class="pane"><div class="zw"><img id="stackBefore" alt="Before 치료 전" draggable="false"></div><div class="lbl l" id="lblSB"><b>원본</b><span>치료 전</span></div></div>
+          <div class="pane"><div class="zw"><img id="stackAfter" alt="After 시뮬레이션" draggable="false"></div><div class="lbl l after" id="lblSA"><b>1번</b><span>시뮬레이션</span></div></div>
+          <div class="stack-arrow">↓ 시뮬레이션 결과</div>
+        </div>
+        <button type="button" class="btn rz-open" id="rzOpen" hidden title="변환된 사진에서 치아를 클릭해 고르고 위·아래·좌·우로 조금씩 키워요">🦷 치아 크기 조절</button>
+        <div class="sm-open" id="smOpenBar" hidden>
+          <button type="button" class="btn" id="smOpen" title="환자 미소 사진에 시뮬레이션 치아를 입혀 미리보기">😊 미소 미리보기</button>
+          <button type="button" class="btn" id="smView" aria-pressed="false" hidden title="미소 사진 ↔ 시뮬레이션 미소 비교">😊 미소 비교</button>
+        </div>
+        <!-- 😊 미소 미리보기 (태블릿이 계산) -->
+        <div class="rz" id="smPanel" hidden>
+          <div class="rz-view" id="smViewBox"><img id="smImg" alt="환자 미소 사진" draggable="false"><img id="smOv" alt="" draggable="false"><canvas id="smCanvas"></canvas>
+            <div class="sm-empty" id="smEmpty">😊 환자의 미소 사진을 올려 주세요<br><small>(개구기 없이 살짝 웃는 정면 사진)</small></div>
+          </div>
+          <div class="rz-tools">
+            <b>😊 미소 미리보기</b>
+            <div class="sm-tabs" id="smTabs" hidden>
+              <button type="button" id="smTabArea" aria-pressed="true">영역 보기</button>
+              <button type="button" id="smTabResult" aria-pressed="false">결과 보기</button>
+            </div>
+            <small id="smHint">사진을 올리면 입술 사이 치아를 자동으로 찾아요</small>
+            <label class="btn sm" for="smFile">📷 미소 사진 올리기</label><input type="file" accept="image/*" id="smFile" hidden>
+            <button type="button" class="btn sm" id="smAuto">🪄 입술 사이 자동 찾기</button>
+            <small>🪄 사진 속 치아를 클릭하면 추가 / 다시 클릭하면 빠짐</small>
+            <div class="rz-acts" style="margin-top:0">
+              <button type="button" class="btn sm" id="smUndo">↶ 선택 취소</button>
+              <button type="button" class="btn sm" id="smClear">🗑 선택 초기화</button>
+            </div>
+            <button type="button" class="btn primary big" id="smMake">😊 미소에 입히기</button>
+            <p class="qa-status" id="smMsg"></p>
+            <small>치아 영역(민트색) 바깥의 입술·얼굴·배경은 원본 그대로예요. 미소 사진은 눈을 가리지 않습니다.</small>
+            <div class="rz-acts"><button type="button" class="btn sm" id="smClose">닫기</button></div>
+          </div>
+        </div>
+        <!-- 🦷 변환된 사진 치아 크기 조절 (태블릿이 계산) -->
+        <div class="rz" id="rzPanel" hidden>
+          <div class="rz-view" id="rzView"><img id="rzImg" alt="크기 조절 미리보기" draggable="false"><canvas id="rzCanvas"></canvas>
+            <div class="zoom-tools rz-zoom"><button type="button" id="rzZin" title="확대 (마우스 휠)">＋</button><button type="button" id="rzZout" title="축소">－</button><button type="button" id="rzZfit" title="전체 보기">⤢</button><span id="rzZlabel"></span></div>
+          </div>
+          <div class="rz-tools">
+            <b>🦷 치아 크기 조절</b>
+            <small id="rzHint">사진에서 치아를 클릭하면 자동으로 골라요 (SAM)</small>
+            <div class="rz-chips" id="rzChips"></div>
+            <div class="rz-arrows" id="rzArrows">
+              <div><span>▲ 위</span><button type="button" data-s="up" data-d="-1">－</button><em data-p="up">0%</em><button type="button" data-s="up" data-d="1">＋</button></div>
+              <div><span>▼ 아래</span><button type="button" data-s="down" data-d="-1">－</button><em data-p="down">0%</em><button type="button" data-s="down" data-d="1">＋</button></div>
+              <div><span>◀ 왼쪽</span><button type="button" data-s="left" data-d="-1">－</button><em data-p="left">0%</em><button type="button" data-s="left" data-d="1">＋</button></div>
+              <div><span>▶ 오른쪽</span><button type="button" data-s="right" data-d="-1">－</button><em data-p="right">0%</em><button type="button" data-s="right" data-d="1">＋</button></div>
+            </div>
+            <div class="rz-acts">
+              <button type="button" class="btn sm" id="rzRemove">이 치아 빼기</button>
+              <button type="button" class="btn sm" id="rzCancel">취소</button>
+              <button type="button" class="btn primary" id="rzApply">✔ 적용 (새 결과로 추가)</button>
+            </div>
+          </div>
+        </div>
+        <div class="zoom-tools" id="zoomTools">
+          <button type="button" id="zIn" title="확대 (마우스 휠 위로)">＋</button>
+          <button type="button" id="zOut" title="축소 (마우스 휠 아래로)">－</button>
+          <button type="button" id="zFit" title="전체 보기">⤢</button>
+          <span id="zLabel" hidden>1.0배</span>
+        </div>
+        <div class="loading" id="loading" hidden><span class="spin"></span><span id="loadingText">사진을 불러오는 중…</span></div>
+      </div>
+      <label class="guide-check" id="guideCheck" hidden>
+        <input type="checkbox" id="drawLines">
+        <span><b>서비컬 라인 그려서 AI 기준 잡기</b><small id="guideHint">체크하면 사진 위에 마우스로 상악·하악 잇몸선을 그릴 수 있어요</small></span>
+      </label>
+      <div class="info-row">
+        <div class="info" id="info"></div>
+        <div class="seg" role="group" aria-label="보기 방식" id="viewSeg">
+          <button type="button" id="vStack">위아래 보기</button>
+          <button type="button" id="vSlider">겹쳐 보기 (손잡이)</button>
+        </div>
+      </div>
+      <div class="memo-box">
+        <label for="memo">📝 상담 메모 <small>태블릿 상담 메모와 실시간으로 함께 바뀝니다</small><span class="memo-st" id="memoSt"></span></label>
+        <textarea id="memo" placeholder="예) 치료 기간 약 3주, 비용 안내 완료"></textarea>
+      </div>
+      <p class="hint" id="hint"></p>
+    </div>
+
+    <aside class="panel" id="panel" aria-label="상담 조작 패널">
+      <div class="old-banner" id="oldBanner" hidden>⚠ 태블릿 앱이 예전 버전이라 일부 PC 조작(셰이드 해제 등)이 전달되지 않아요.<br>태블릿에 <b>새 앱(APK)</b>을 설치해 주세요.</div>
+      <div class="old-banner" id="ackBanner" hidden>⚠ 태블릿이 PC 조작을 받지 못하고 있어요.<br>태블릿 앱이 켜져 있는지, 인터넷이 연결돼 있는지 확인해 주세요.</div>
+      <div class="done-banner" id="doneBanner" hidden>✓ 상담 완료된 환자입니다 · 내용은 바꿀 수 없어요</div>
+
+      <div class="p-sec">
+        <div class="p-row">
+          <label class="btn file-btn">📷 PC에서 사진 올리기<input type="file" id="fileInput" accept="image/*" hidden></label>
+          <button type="button" class="btn" id="undoBtn" hidden>↶ 이전으로</button>
+          <button type="button" class="btn" id="redoBtn" hidden>↷ 다시 돌아가기</button>
+        </div>
+        <div class="p-row">
+          <button type="button" class="btn" id="beforeBtn" hidden>처음 사진 보기</button>
+          <button type="button" class="btn" id="afterBtn" hidden>After 다시 보기</button>
+          <label class="switch"><input type="checkbox" id="briefing"><span>🖥 환자 브리핑 모드</span></label>
+        </div>
+        <small class="p-note" id="uploadSt"></small>
+      </div>
+
+      <div class="p-sec">
+        <h3>환자 이름</h3>
+        <input type="text" id="pname" maxlength="30" placeholder="환자 이름 입력" autocomplete="off">
+      </div>
+
+      <div class="p-sec">
+        <h3>치료 종류 <small>(라미네이트·무삭제 라미네이트는 둘 중 하나만)</small></h3>
+        <div class="chips" id="txChips"></div>
+      </div>
+
+      <div class="p-sec">
+        <h3>치료 부위 <small>(FDI · 화면 왼쪽 = 환자 오른쪽)</small></h3>
+        <div class="arch" id="upperArch"></div>
+        <div class="arch" id="lowerArch"></div>
+        <div class="p-row">
+          <button type="button" class="btn sm" data-group="13,12,11,21,22,23">상악 앞니 6</button>
+          <button type="button" class="btn sm" data-group="43,42,41,31,32,33">하악 앞니 6</button>
+          <button type="button" class="btn sm" id="clearTeeth">선택 해제</button>
+        </div>
+      </div>
+
+      <div class="p-sec">
+        <h3>희망 셰이드 <small>(한 번 더 누르면 선택 해제 · 색 강제 적용 안 함)</small></h3>
+        <div class="chips" id="shadeChips"></div>
+      </div>
+
+      <div class="p-sec ai-box">
+        <label class="switch"><input type="checkbox" id="useAi"><span>🤖 AI 시뮬레이션 사용</span></label>
+        <small class="p-note" id="aiNote"></small>
+      <div class="engine-box" id="engineBox" hidden>
+        <h3>AI 시뮬레이션 엔진 <small>(하나 선택 · API 키는 태블릿 [API 키 설정]에서)</small></h3>
+        <div class="engines" id="engines"></div>
+        <small class="p-note" id="engineNote"></small>
+      </div>
+        <div id="aiReqBox">
+          <div class="auto-box">
+            <h3>자동 임상 지시 <small>(치료 항목·부위·셰이드 기준)</small></h3>
+            <small class="p-auto" id="aiAuto"></small>
+            <details><summary>AI에 보낼 전체 지시 보기</summary><pre id="aiPrompt"></pre></details>
+          </div>
+          <div class="p-row between"><h3>추가 요청 <small>(선택 · 직접 입력 · 한글 OK)</small></h3><button type="button" class="btn sm" id="aiDefault" hidden>지우기</button></div>
+          <textarea id="aiReq" rows="3" placeholder="자동 임상 지시에 더할 내용 (예: 11, 21 길이 1mm 늘리고 정중선 맞추기)"></textarea>
+        </div>
+      </div>
+
+      <div class="p-sec">
+        <div class="p-row between"><h3>적용 강도</h3><b id="strengthVal">90%</b></div>
+        <input type="range" id="strength" min="30" max="100" step="5" value="90">
+      </div>
+
+      <button type="button" class="convert" id="convertBtn">✨ After 변환하기</button>
+      <small class="p-note center" id="convertNote"></small>
+      <small class="p-note center" id="appVer"></small>
+    </aside>
+  </section>
+
+  <!-- 4) 오류 -->
+  <section class="screen center" id="errorScreen" hidden>
+    <div class="standby">
+      <h1 id="errTitle">연결할 수 없습니다</h1>
+      <p id="errText">인터넷 연결을 확인한 뒤 새로고침(F5) 해 주세요.</p>
+    </div>
+  </section>
+</main>
+
+
+<!-- 🤖 자동 QA (태블릿에서 실행, PC 에서 조작·확인) -->
+<div class="overlay" id="qaOv" hidden role="dialog" aria-modal="true" aria-labelledby="qaTitle">
+  <div class="ov-card">
+    <div class="ov-head">
+      <h2 id="qaTitle">🤖 자동 QA 에이전트</h2>
+      <button class="btn" type="button" id="qaToArch">📚 보관함</button>
+      <button class="btn icon" type="button" data-close="qaOv" aria-label="닫기">✕</button>
+    </div>
+    <div class="ov-body">
+      <p class="qa-warn" id="qaWarn" hidden></p>
+      <div class="qa-box">
+        <p class="qa-cond" id="qaCond"></p>
+        <div class="qa-photos">
+          <figure><figcaption>① 변환 전 원본</figcaption><div class="qa-ph" id="qaOrig"></div></figure>
+          <figure><figcaption>② 🎯 목표 정답지 (선택)</figcaption>
+            <label class="qa-ph pick" id="qaTarget" tabindex="0">
+              <span>클릭해서 실제 치료 후 사진 올리기<br><small>(없으면 AI 자체 평가)</small></span>
+              <input type="file" accept="image/*" id="qaFile" hidden>
+            </label>
+          </figure>
+          <figure><figcaption>③ AI 결과 (최근 회차)</figcaption><div class="qa-ph" id="qaLatest"></div></figure>
+        </div>
+        <div class="qa-tgt-acts" id="qaTgtActs" hidden>
+          <button class="btn sm" type="button" id="qaTgtChange">정답지 바꾸기</button>
+          <button class="btn sm danger" type="button" id="qaTgtClear">✕ 정답지 지우기</button>
+        </div>
+        <small class="p-note" id="qaUpSt"></small>
+        <div class="qa-pass" role="radiogroup" aria-label="목표 점수">
+          <b>🎯 목표 점수</b>
+          <label><input type="radio" name="qaPass" value="80"> 80점 이상</label>
+          <label><input type="radio" name="qaPass" value="90" checked> 90점 이상</label>
+        </div>
+        <div class="qa-modes" role="radiogroup" aria-label="테스트 방식">
+          <label><input type="radio" name="qaMode" value="one" checked> <span id="qaOneLabel">현재 선택한 엔진만 테스트</span></label>
+          <label><input type="radio" name="qaMode" value="all"> 옵션 A · B · C 전체 자동 비교 테스트 <small>(세 엔진을 각각 최대 5회 · 순위 리포트)</small></label>
+        </div>
+        <label class="qa-model">채점 모델 <input type="text" id="qaScorer" placeholder="비워 두면 자동으로 찾음 (예: gemini-3.1-pro)"></label>
+        <small class="p-note"><span id="qaPassNote">목표 90점</span> · 최대 5회 · 원본·정답지·결과 3장 비교, 4대 기준 각 25점 · 먼저 채점 AI 연결을 확인하고 안 되면 변환하지 않습니다</small>
+        <div class="qa-actions">
+          <button class="btn primary big" type="button" id="qaStart">자동 QA 테스트 시작</button>
+          <button class="btn big" type="button" id="qaStop" hidden>■ 중지</button>
+        </div>
+        <p class="qa-status" id="qaStatus" aria-live="polite"></p>
+      </div>
+      <div id="qaReport"></div>
+      <div id="qaRuns"></div>
+    </div>
+  </div>
+</div>
+
+<!-- 📚 프롬프트 보관함 -->
+<div class="overlay" id="archOv" hidden role="dialog" aria-modal="true" aria-labelledby="archTitle">
+  <div class="ov-card wide">
+    <div class="ov-head">
+      <h2 id="archTitle">📚 프롬프트 보관함</h2>
+      <small class="p-note" id="archNote">태블릿에 저장된 케이스 (최근 40개)</small>
+      <button class="btn icon" type="button" data-close="archOv" aria-label="닫기">✕</button>
+    </div>
+    <div class="ov-body">
+      <div class="folders" id="archFolders" role="tablist"></div>
+      <p class="qa-status" id="archMsg" aria-live="polite"></p>
+      <div class="arch-grid" id="archGrid"></div>
+    </div>
+  </div>
+</div>
+
+<!-- 🗂 환자 기록 -->
+<div class="overlay" id="recOv" hidden role="dialog" aria-modal="true" aria-labelledby="recTitle">
+  <div class="ov-card wide">
+    <div class="ov-head">
+      <h2 id="recTitle">🗂 환자 기록</h2>
+      <small class="p-note" id="recNote">태블릿에 저장된 기록 (최근 150건)</small>
+      <button class="btn icon" type="button" data-close="recOv" aria-label="닫기">✕</button>
+    </div>
+    <div class="ov-body">
+      <div class="rec-search">
+        <input type="search" id="recQ" placeholder="이름 · 날짜(예: 11.18) · 치료종류로 검색" aria-label="검색">
+        <label class="rec-date">📅 <input type="date" id="recDay" aria-label="날짜로 찾기"></label>
+        <button class="btn sm" type="button" id="recReset">초기화</button>
+      </div>
+      <div class="folders" id="recTx" role="group" aria-label="치료종류"></div>
+      <small class="p-note" id="recCount"></small>
+      <div id="recTree"></div>
+    </div>
+  </div>
+</div>
+<div class="overlay" id="recDetOv" hidden role="dialog" aria-modal="true" aria-labelledby="recDetTitle">
+  <div class="ov-card wide">
+    <div class="ov-head">
+      <h2 id="recDetTitle">기록</h2>
+      <button class="btn sm primary" type="button" id="recLoad" title="원본·변환 결과·상담 내용을 시뮬레이터에 다시 열기">🖼 시뮬레이터로 불러오기</button>
+      <button class="btn sm" type="button" id="recSmile" title="불러온 뒤 미소 미리보기 바로 열기">😊 미소 미리보기</button>
+      <button class="btn sm danger" type="button" id="recDel">삭제</button>
+      <button class="btn icon" type="button" data-close="recDetOv" aria-label="닫기">✕</button>
+    </div>
+    <div class="ov-body" id="recDetBody"></div>
+  </div>
+</div>
+
+<!-- 사진 크게 비교 -->
+<div class="overlay dark" id="cmpOv" hidden role="dialog" aria-modal="true">
+  <div class="cmp-wrap">
+    <button class="btn icon" type="button" data-close="cmpOv" aria-label="닫기">✕</button>
+    <div class="cmp-row" id="cmpRow"></div>
+  </div>
+</div>
+
+<script src="qrcode.min.js"></script>
+<script type="module" src="app.js?v=3.24"></script>
+</body>
+</html>

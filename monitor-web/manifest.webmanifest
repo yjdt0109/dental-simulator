@@ -1,0 +1,15 @@
+{
+  "name": "B&A 상담 모니터",
+  "short_name": "상담 모니터",
+  "description": "태블릿 비포&애프터 시뮬레이터 화면을 상담실 PC에 크게 보여줍니다.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#F3F6FA",
+  "theme_color": "#0066CC",
+  "lang": "ko",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
+  ]
+}
