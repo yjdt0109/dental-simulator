@@ -901,7 +901,7 @@ function renderQa() {
   const running = !!q.running;
   const newApp = !!qa;
   const warn = !qaConnected() ? '태블릿이 연결되어 있지 않습니다. QR 로 연결해 주세요.'
-    : !newApp ? '태블릿 앱을 최신 버전(2026.11.18-i 이상)으로 업데이트해야 자동 QA 를 PC 에서 쓸 수 있습니다.'
+    : !newApp ? '태블릿 앱을 최신 버전(2026.11.19-b 이상)으로 업데이트해야 자동 QA 를 PC 에서 쓸 수 있습니다.'
     : !(images && images.before) ? '태블릿에서 환자 사진을 먼저 올려 주세요 (PC 의 [사진 올리기] 도 가능).'
     : q.ready === false ? '태블릿의 AI 연결이 준비되지 않았습니다 (태블릿 [API 키 설정] 확인).' : '';
   $('#qaWarn').hidden = !warn; $('#qaWarn').textContent = warn;
@@ -1025,7 +1025,7 @@ function renderArchive() {
   const a = archive;
   if (!qaConnected() || !a) {
     setHtml($('#archFolders'), '');
-    setHtml($('#archGrid'), `<p class="empty">${!qaConnected() ? '태블릿을 연결하면 태블릿에 저장된 보관함이 보입니다.' : '보관함이 비어 있거나, 태블릿 앱 업데이트(2026.11.18-i 이상)가 필요합니다.'}</p>`);
+    setHtml($('#archGrid'), `<p class="empty">${!qaConnected() ? '태블릿을 연결하면 태블릿에 저장된 보관함이 보입니다.' : '보관함이 비어 있거나, 태블릿 앱 업데이트(2026.11.19-b 이상)가 필요합니다.'}</p>`);
     return;
   }
   const folders = a.folders || [];
@@ -1142,7 +1142,7 @@ function renderRecords() {
   if ($('#recOv').hidden) return;
   if (!qaConnected() || !records) {
     setHtml($('#recTx'), ''); $('#recCount').textContent = '';
-    setHtml($('#recTree'), `<p class="empty">${!qaConnected() ? '태블릿을 연결하면 태블릿에 저장된 환자 기록이 보입니다.' : '아직 저장된 기록이 없거나, 태블릿 앱 업데이트(2026.11.18-i 이상)가 필요합니다.'}</p>`);
+    setHtml($('#recTree'), `<p class="empty">${!qaConnected() ? '태블릿을 연결하면 태블릿에 저장된 환자 기록이 보입니다.' : '아직 저장된 기록이 없거나, 태블릿 앱 업데이트(2026.11.19-b 이상)가 필요합니다.'}</p>`);
     return;
   }
   setHtml($('#recTx'), TX_ALL.map((t) => `<button type="button" data-tx="${esc(t)}" class="${recTx === t ? 'on' : ''}" aria-pressed="${recTx === t}">${esc(t)}</button>`).join(''));
@@ -1359,17 +1359,25 @@ new ResizeObserver(drawRz).observe($('#rzView'));
 // =============================================================================
 // 😊 미소 미리보기 (v3.21) — 미소 사진에 시뮬레이션 치아 입히기 (태블릿이 계산)
 // =============================================================================
-let smOpen = false, smTab = 'area', smileData = null, smWaiting = false, smSawBusy = false;
+let smOpen = false, smTab = 'area', smileData = null, smWaiting = false, smSawBusy = false, smMWaiting = false, smMSawBusy = false;
 function showSmileImg() {
   const v = smileData;
+  if (smTab[0] === 'm' && !(v && v[smTab])) smTab = 'area';
+  const mt = smTab[0] === 'm' ? v[smTab] : null;
   const result = smTab === 'result' && v && v.after;
-  $('#smImg').src = result ? 'data:image/jpeg;base64,' + v.after : v && v.photo ? 'data:image/jpeg;base64,' + v.photo : '';
+  $('#smImg').src = mt ? 'data:image/jpeg;base64,' + mt : result ? 'data:image/jpeg;base64,' + v.after : v && v.photo ? 'data:image/jpeg;base64,' + v.photo : '';
   $('#smOv').src = v && v.ov ? 'data:image/png;base64,' + v.ov : '';
-  $('#smOv').hidden = !(v && v.ov) || !!result;
+  $('#smOv').hidden = !(v && v.ov) || smTab !== 'area';
   $('#smEmpty').hidden = !!(v && v.photo);
-  $('#smTabs').hidden = !(v && v.after);
-  $('#smTabArea').setAttribute('aria-pressed', String(!result));
+  $('#smTabs').hidden = !(v && (v.after || v.m3));
+  $('#smTabArea').setAttribute('aria-pressed', String(smTab === 'area'));
   $('#smTabResult').setAttribute('aria-pressed', String(!!result));
+  $('#smTabResult').hidden = !(v && v.after);
+  $('#smMTabs').hidden = !(v && v.m3);
+  document.querySelectorAll('#smMTabs button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.m === smTab)));
+  $('#smPick').hidden = !mt;
+  $('#smP2').hidden = !(v && v.p2);
+  if (v && v.p2) $('#smP2').src = 'data:image/jpeg;base64,' + v.p2;
 }
 function renderSmile(view) {
   const sm = (state && state.smile) || null;
@@ -1379,7 +1387,14 @@ function renderSmile(view) {
     smWaiting = false; smSawBusy = false;
     if (sm.made) { smOpen = false; smTab = 'result'; showSmileImg(); }
   }
-  const can = !!sm && state.useAi && state.hasAfter && view !== 'edit' && !locked() && !(state && state.rz);
+  // 🦷 정밀 매칭이 끝나면 창을 닫고 큰 화면에 미소 비교 (다시 열면 ①②③ 단계 탭)
+  const mm = (sm && sm.match) || null;
+  if (mm && smMWaiting && mm.busy) smMSawBusy = true;
+  if (mm && smMWaiting && smMSawBusy && !mm.busy) {
+    smMWaiting = false; smMSawBusy = false;
+    if (mm.made) { smOpen = false; smTab = 'm3'; showSmileImg(); }
+  }
+  const can = !!sm && state.useAi && view !== 'edit' && !locked() && !(state && state.rz);
   $('#smOpenBar').hidden = !can || smOpen;
   $('#smView').hidden = !(sm && sm.made);
   $('#smView').setAttribute('aria-pressed', String(!!(sm && sm.view)));
@@ -1390,10 +1405,21 @@ function renderSmile(view) {
   if (!smOpen) return;
   $('#smAuto').hidden = !sm.auto || !sm.has;
   $('#smUndo').disabled = !sm.undo; $('#smClear').disabled = !(sm.n > 0);
-  $('#smMake').disabled = !sm.has || !(sm.n > 0) || sm.busy;
+  $('#smMake').disabled = !sm.has || !(sm.n > 0) || sm.busy || !state.hasAfter;
   $('#smMake').textContent = sm.busy ? '⏳ 처리 중…' : sm.made ? '😊 다시 입히기' : '😊 미소에 입히기';
   $('#smHint').textContent = !sm.has ? '사진을 올리면 입술 사이 치아를 자동으로 찾아요' : sm.n > 0 ? `치아 영역 ${sm.n}개 선택됨` : '🪄 미소 사진 속 치아를 클릭해 고르세요';
   $('#smMsg').textContent = sm.msg || '';
+  // 🦷 보철 사진 정밀 매칭 (태블릿 앱 2026.11.19-b 이상)
+  $('#smMatch').hidden = !mm;
+  if (mm) {
+    const busy = !!mm.busy;
+    $('#smP2After').disabled = busy || !state.hasAfter;
+    $('#smP2After').title = state.hasAfter ? '지금 큰 화면의 변환 결과를 2번 사진으로 써요' : '변환 결과가 아직 없어요';
+    $('#smMatchRun').disabled = busy || !mm.ok || !sm.has || !mm.has2;
+    $('#smMatchRun').textContent = busy ? '⏳ 정밀 매칭 중…' : mm.made ? '🎯 다시 매칭' : '🎯 정밀 매칭 시작';
+    $('#smP2Label').textContent = mm.has2 ? '2번: ' + (mm.label || '보철 사진') : '2번 보철 사진을 올리거나 지금 결과를 쓰세요';
+    $('#smMatchMsg').textContent = !mm.ok ? '⚠ 이 태블릿에서는 정밀 매칭을 쓸 수 없어요 (안드로이드 태블릿 필요)' : !sm.has ? '먼저 위에서 미소 사진(1번)을 올려 주세요' : mm.step || '';
+  }
 }
 function smRect() {
   const im = $('#smImg'), box = $('#smViewBox').getBoundingClientRect();
@@ -1401,7 +1427,11 @@ function smRect() {
   const k = Math.min(box.width / iw, box.height / ih);
   return { x: (box.width - iw * k) / 2, y: (box.height - ih * k) / 2, w: iw * k, h: ih * k };
 }
-$('#smOpen').addEventListener('click', () => { smOpen = true; smTab = 'area'; showSmileImg(); render(); });
+$('#smOpen').addEventListener('click', () => { smOpen = true; smTab = smileData && smileData.m3 && state.smile && state.smile.match && state.smile.match.pick ? 'm' + state.smile.match.pick : 'area'; showSmileImg(); render(); });
+document.querySelectorAll('#smMTabs button').forEach((b) => b.addEventListener('click', () => { smTab = b.dataset.m; showSmileImg(); }));
+$('#smPick').addEventListener('click', () => { if (smTab[0] !== 'm') return; cmd('matchPick', Number(smTab.slice(1))); smOpen = false; render(); });
+$('#smP2After').addEventListener('click', () => cmd('matchUseAfter'));
+$('#smMatchRun').addEventListener('click', () => { smMWaiting = true; smMSawBusy = false; cmd('matchRun'); $('#smMatchMsg').textContent = '🎯 정밀 매칭을 시작합니다…'; });
 $('#smTabArea').addEventListener('click', () => { smTab = 'area'; showSmileImg(); });
 $('#smTabResult').addEventListener('click', () => { smTab = 'result'; showSmileImg(); });
 $('#smClose').addEventListener('click', () => { smOpen = false; render(); });
@@ -1417,23 +1447,26 @@ $('#smCanvas').addEventListener('click', (e) => {
   if (x < 0 || y < 0 || x > 1 || y > 1) return;
   cmd('smileTap', { x: Math.round(x * 1000) / 1000, y: Math.round(y * 1000) / 1000 });
 });
-$('#smFile').addEventListener('change', async (e) => {
+// 사진 파일 → 긴 변 2400 JPEG base64 → 태블릿으로
+async function sendPhoto(e, cmdName, msgEl, what) {
   const f = e.target.files && e.target.files[0];
   e.target.value = '';
   if (!f) return;
   try {
-    $('#smMsg').textContent = '미소 사진을 태블릿으로 보내는 중…';
+    $(msgEl).textContent = what + '을 태블릿으로 보내는 중…';
     const bmp = await createImageBitmap(f, { imageOrientation: 'from-image' });
     const k = Math.min(1, 2400 / Math.max(bmp.width, bmp.height));
     const c = document.createElement('canvas');
     c.width = Math.round(bmp.width * k); c.height = Math.round(bmp.height * k);
     c.getContext('2d').drawImage(bmp, 0, 0, c.width, c.height);
-    cmd('smilePhoto', c.toDataURL('image/jpeg', 0.92).split(',')[1]);
+    cmd(cmdName, c.toDataURL('image/jpeg', 0.92).split(',')[1]);
   } catch (err) {
     console.error(err);
-    $('#smMsg').textContent = '사진을 보내지 못했습니다 · 다른 사진으로 시도해 주세요';
+    $(msgEl).textContent = '사진을 보내지 못했습니다 · 다른 사진으로 시도해 주세요';
   }
-});
+}
+$('#smFile').addEventListener('change', (e) => sendPhoto(e, 'smilePhoto', '#smMsg', '미소 사진'));
+$('#smP2File').addEventListener('change', (e) => sendPhoto(e, 'matchPhoto', '#smMatchMsg', '보철 사진'));
 
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
 start();

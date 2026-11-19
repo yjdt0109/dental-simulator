@@ -35,6 +35,7 @@ import 'resize_session.dart';
 import 'sim_import.dart';
 import 'smile_screen.dart';
 import '../ai/smile.dart' show makeSmile;
+import '../ai/smile_match.dart';
 import '../privacy/mouth_finder.dart';
 
 import 'package:image/image.dart' as img;
@@ -233,6 +234,15 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
         'view': _smileView && p.smileAfter != null,
         'msg': _smileMsg,
         'auto': MouthFinder.supported,
+        'match': {
+          'ok': DentalAligner.supported || debugMatchOverride != null,
+          'has2': _mFor == p.id && _mProsth != null,
+          'label': _mFor == p.id ? _mLabel : '',
+          'busy': _mBusy,
+          'step': _mFor == p.id ? _mStep : '',
+          'made': _mFor == p.id && _mRes != null,
+          'pick': _mPick,
+        },
       },
       'lineUndo': p.lineHistory.isNotEmpty,
       'lines': [
@@ -1086,6 +1096,21 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
         _smileRemoteMake(p);
       case 'smileView':
         setState(() => _smileView = v == true && p.smileAfter != null);
+      case 'matchPhoto': // PC 🦷 보철 사진(2번) 올리기
+        if (v is String && v.length < 12000000) {
+          _matchSet(p, base64Decode(v), '보철 사진 (PC에서 올림)');
+        }
+      case 'matchUseAfter':
+        final a = _shownAfter(p);
+        if (a != null) {
+          final n =
+              p.compare.where((i) => i > 0).lastOrNull ?? p.results.length;
+          _matchSet(p, a, _label(p, n));
+        }
+      case 'matchRun':
+        _matchRun(p);
+      case 'matchPick':
+        if (v is num) _matchPick(p, v.toInt());
       case 'rzStart':
         _rzStart(p);
       case 'rzTap':
@@ -2230,6 +2255,13 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
       if (p.smileSet?.overlay != null) 'ov': base64Encode(p.smileSet!.overlay!),
       if (p.smileAfter != null)
         'after': await jpegBase64(p.smileAfter!, maxSide: 1280),
+      if (_mFor == p.id && _mProsth != null)
+        'p2': await jpegBase64(_mProsth!, maxSide: 480, quality: 75),
+      if (_mFor == p.id && _mRes != null) ...{
+        'm1': await jpegBase64(_mRes!.composite, maxSide: 1280),
+        'm2': await jpegBase64(_mRes!.stage1, maxSide: 1280),
+        'm3': await jpegBase64(_mRes!.finalImage, maxSide: 1280),
+      },
     });
   }
 
@@ -2332,6 +2364,99 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
     } finally {
       if (mounted) setState(() => _smileMaking = false);
     }
+  }
+
+  // ── 🦷 보철 사진 정밀 매칭 (PC 원격) ─────────────────────────────
+  String? _mFor; // 어느 환자 사진의 매칭인지
+  Uint8List? _mProsth;
+  String _mLabel = '';
+  bool _mBusy = false;
+  String _mStep = '';
+  MatchResult? _mRes;
+  int _mPick = 3;
+
+  void _matchReset(PatientPhoto p) {
+    if (_mFor == p.id) return;
+    _mFor = p.id;
+    _mProsth = null;
+    _mLabel = '';
+    _mStep = '';
+    _mRes = null;
+    _mPick = 3;
+  }
+
+  void _matchSet(PatientPhoto p, Uint8List b, String label) {
+    if (_mBusy) return;
+    _matchReset(p);
+    _mProsth = b;
+    _mLabel = label;
+    _mRes = null;
+    _mStep = '2번 사진 준비 완료 · [정밀 매칭 시작]을 눌러 주세요';
+    _smilePublish(p);
+  }
+
+  Future<void> _matchRun(PatientPhoto p) async {
+    _matchReset(p);
+    final smile = p.smile, prosth = _mProsth;
+    if (_mBusy) return;
+    if (smile == null || prosth == null) {
+      _mStep = smile == null ? '먼저 미소 사진(1번)을 올려 주세요' : '보철 사진(2번)을 골라 주세요';
+      _smilePublish(p);
+      return;
+    }
+    final run =
+        debugMatchOverride ??
+        (s, pr, step) => matchProsthesis(smile: s, prosth: pr, onStep: step);
+    if (!DentalAligner.supported && debugMatchOverride == null) {
+      _mStep = '이 기기에서는 정밀 매칭을 쓸 수 없어요 (안드로이드 태블릿 필요)';
+      _smilePublish(p);
+      return;
+    }
+    setState(() {
+      _mBusy = true;
+      _mRes = null;
+      _mStep = '시작합니다…';
+    });
+    _smilePublish(p);
+    try {
+      final r = await run(smile, prosth, (m) {
+        _mStep = m;
+        _smilePublish(p);
+      });
+      if (!mounted) return;
+      setState(() {
+        _mRes = r;
+        _mPick = 3;
+        p.smileAfter = r.finalImage;
+        p.smileFrom = '보철 사진 정밀 매칭';
+        _smileView = identical(p, _cur);
+        _mStep =
+            '완성! ${r.align.summary}${r.notes.isEmpty ? '' : '\n${r.notes.join('\n')}'}';
+      });
+      _smileSave(p);
+    } on PipelineError catch (e) {
+      _mStep = '⚠ ${e.message}';
+    } on AiError catch (e) {
+      _mStep = '⚠ ${e.message}';
+    } catch (e) {
+      _mStep = '⚠ 정밀 매칭에 실패했습니다 ($e)';
+    } finally {
+      if (mounted) setState(() => _mBusy = false);
+      _smilePublish(p);
+    }
+  }
+
+  void _matchPick(PatientPhoto p, int n) {
+    final r = _mRes;
+    if (r == null || _mFor != p.id || n < 1 || n > 3) return;
+    setState(() {
+      _mPick = n;
+      p.smileAfter = [r.composite, r.stage1, r.finalImage][n - 1];
+      p.smileFrom = '보철 사진 정밀 매칭 (${['① 정렬 합성', '② FLUX 1차', '③ 최종'][n - 1]})';
+      _smileView = true;
+    });
+    _smilePublish(p);
+    _smileSave(p);
   }
 
   Future<void> _openSmile(PatientPhoto p) async {

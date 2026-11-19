@@ -1,4 +1,3 @@
-
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:image/image.dart' as img;
@@ -232,6 +231,16 @@ Uint8List _pasteBack((Uint8List, Uint8List, Rect) a) {
   img.compositeImage(full, part, dstX: x, dstY: y);
   return img.encodeJpg(full, quality: 95);
 }
+
+/// 전체 정밀 매칭 함수 모양 (미소, 보철, 단계 알림) → 결과
+typedef MatchFn = Future<MatchResult> Function(
+  Uint8List smile,
+  Uint8List prosth,
+  void Function(String) onStep,
+);
+
+/// 테스트용: 메인 화면(PC 원격)의 정밀 매칭을 가짜로 바꿈 (평소엔 null)
+MatchFn? debugMatchOverride;
 
 typedef AlignFn = Future<AlignOut> Function(Uint8List smile, Uint8List prosth);
 typedef FillFn = Future<Uint8List> Function(

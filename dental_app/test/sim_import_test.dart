@@ -6,6 +6,7 @@ import 'package:dental_app/models/clinic_profile.dart';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:dental_app/ai/smile_match.dart';
 import 'package:dental_app/cast/cast_service.dart';
 import 'package:dental_app/qa/qa_remote.dart';
 import 'package:dental_app/records/records.dart';
@@ -155,6 +156,44 @@ void main() {
     ); // 새 사진이라 예전 결과는 지움
     expect(PatientRecords.instance.records.single.hasSmile, isTrue);
     expect(find.textContaining('미소 사진을 2026.'), findsWidgets);
+    // 🦷 PC 에서 보철 사진 정밀 매칭: 지금 결과를 2번으로 → 시작 → ③ 최종이 미소 비교로 + 기록 저장
+    final steps = <String>[];
+    debugMatchOverride = (s, pr, step) async {
+      step('① 📍 정렬 중…');
+      steps.add('run');
+      return MatchResult(
+        align: AlignOut(
+          alignedTeeth: Uint8List(0),
+          mask: Uint8List(0),
+          crop: Uint8List(0),
+          residual: 0.003,
+          eyes: true,
+          scale: 1.0,
+          degrees: 0.5,
+        ),
+        composite: jpg(10),
+        stage1: jpg(20),
+        finalImage: jpg(250),
+      );
+    };
+    addTearDown(() => debugMatchOverride = null);
+    await t.runAsync(() async {
+      CastService.instance.onRemoteCmd?.call({'t': 'matchRun'}); // 2번 없음 → 안내만
+      CastService.instance.onRemoteCmd?.call({'t': 'matchUseAfter'});
+      CastService.instance.onRemoteCmd?.call({'t': 'matchRun'});
+      await Future<void>.delayed(const Duration(milliseconds: 1500));
+    });
+    await _settle(t);
+    expect(steps, ['run']);
+    expect(find.textContaining('보철 사진 정밀 매칭'), findsWidgets);
+    expect(File('${dir.path}/smile_after.jpg').existsSync(), isTrue);
+    // ① 정렬 합성을 골라 미소 비교에 쓰기
+    await t.runAsync(() async {
+      CastService.instance.onRemoteCmd?.call({'t': 'matchPick', 'v': 1});
+      await Future<void>.delayed(const Duration(milliseconds: 800));
+    });
+    await _settle(t);
+    expect(find.textContaining('① 정렬 합성'), findsWidgets);
     expect(t.takeException(), isNull);
   });
 }

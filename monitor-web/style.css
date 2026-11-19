@@ -381,3 +381,9 @@ table.rank td { padding: 8px; border-top: 1px solid var(--line); }
 .rz-zoom { position: absolute; right: 10px; top: 10px; bottom: auto; }
 .rz-zoom span { color: #fff; font-weight: 800; text-shadow: 0 1px 3px #000; text-align: center; }
 #rzCanvas.panning { cursor: grabbing; }
+
+/* ---- 🦷 보철 사진 정밀 매칭 (v3.25) ---- */
+.sm-match { display: flex; flex-direction: column; gap: 8px; border-top: 1px solid var(--line); padding-top: 10px; }
+.sm-match img { width: 100%; max-height: 120px; object-fit: contain; background: #000; border-radius: 9px; }
+#smMatchMsg { white-space: pre-line; }
+#smMTabs button { font-size: 12.5px; padding: 7px 4px; white-space: nowrap; }
