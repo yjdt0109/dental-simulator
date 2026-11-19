@@ -4,7 +4,7 @@
 > "HANDOFF.md 읽고 이어서 작업해줘"라고 하면 됩니다. 답변은 항상 한글로.
 
 ## 1. 현재 버전
-- 태블릿 앱(안드로이드 APK, Flutter): **2026.11.19-b** (`lib/cast/cast_service.dart`의 `appVersion`)
+- 태블릿 앱(안드로이드 APK, Flutter): **2026.11.19-c** (`lib/cast/cast_service.dart`의 `appVersion`)
 - 상담 PC 모니터(웹, Netlify에 폴더째 끌어다 놓기): **v3.25** (`monitor-web/`)
 - 자동 테스트: 124개 모두 통과 (`flutter test`)
 
@@ -56,3 +56,6 @@ flutter build apk --release   # build/app/outputs/flutter-apk/app-release.apk
 ## 7. 주의
 - 환자 사진은 민감정보: 미소 사진은 눈을 가리지 않음 → 동의 안내. AI 학습에 쓰려면 별도 동의
 - API 키·비밀번호는 채팅에 붙여넣지 말고 앱 설정에만 입력
+
+## 8. 알려진 문제·해결 기록
+- 2026.11.19-b: PC 정밀 매칭에서 "Field platform_ for wz0 not found" → 릴리스 빌드의 코드 이름 줄이기(R8)가 MediaPipe 내부 이름을 바꿔서 생김. `android/app/proguard-rules.pro` 에 MediaPipe·protobuf 보호 규칙 추가 (2026.11.19-c)
