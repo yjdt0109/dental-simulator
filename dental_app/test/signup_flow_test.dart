@@ -55,7 +55,8 @@ void main() {
       expect(find.text('안녕하세요, 김민지님'), findsOneWidget);
       expect(find.text('B&A 치과 시뮬레이터'), findsOneWidget);
       expect(find.text('주위 치과 추천'), findsOneWidget);
-      expect(find.text('추가 서비스 준비 중'), findsNWidgets(2));
+      expect(find.text('추가 서비스 준비 중'), findsOneWidget);
+      expect(find.text('시뮬레이터 불러오기'), findsOneWidget);
       expect(t.takeException(), isNull);
 
       await t.tap(find.text('주위 치과 추천'));

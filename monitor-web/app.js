@@ -107,7 +107,7 @@ function render() {
   const tabletView = state.view || 'edit';
   if (tabletView !== lastTabletView) { lastTabletView = tabletView; localView = null; }
   const items = Array.isArray(state.items) ? state.items.map(String) : ['원본'];
-  const subs = Array.isArray(state.subs) ? state.subs.map(String) : []; // 태블릿 2026.11.19-e 이상: 불러온 사진 설명
+  const subs = Array.isArray(state.subs) ? state.subs.map(String) : []; // 태블릿 2026.11.19-f 이상: 불러온 사진 설명
   const cmp = Array.isArray(state.cmp) ? state.cmp.filter((n) => Number.isInteger(n) && n < items.length) : [0];
   const hasAfterShown = tabletView !== 'edit' && images && images.after;
   // one: 비교 목록에서 1장만 고름 → 그 사진만 크게
@@ -902,7 +902,7 @@ function renderQa() {
   const running = !!q.running;
   const newApp = !!qa;
   const warn = !qaConnected() ? '태블릿이 연결되어 있지 않습니다. QR 로 연결해 주세요.'
-    : !newApp ? '태블릿 앱을 최신 버전(2026.11.19-e 이상)으로 업데이트해야 자동 QA 를 PC 에서 쓸 수 있습니다.'
+    : !newApp ? '태블릿 앱을 최신 버전(2026.11.19-f 이상)으로 업데이트해야 자동 QA 를 PC 에서 쓸 수 있습니다.'
     : !(images && images.before) ? '태블릿에서 환자 사진을 먼저 올려 주세요 (PC 의 [사진 올리기] 도 가능).'
     : q.ready === false ? '태블릿의 AI 연결이 준비되지 않았습니다 (태블릿 [API 키 설정] 확인).' : '';
   $('#qaWarn').hidden = !warn; $('#qaWarn').textContent = warn;
@@ -1026,7 +1026,7 @@ function renderArchive() {
   const a = archive;
   if (!qaConnected() || !a) {
     setHtml($('#archFolders'), '');
-    setHtml($('#archGrid'), `<p class="empty">${!qaConnected() ? '태블릿을 연결하면 태블릿에 저장된 보관함이 보입니다.' : '보관함이 비어 있거나, 태블릿 앱 업데이트(2026.11.19-e 이상)가 필요합니다.'}</p>`);
+    setHtml($('#archGrid'), `<p class="empty">${!qaConnected() ? '태블릿을 연결하면 태블릿에 저장된 보관함이 보입니다.' : '보관함이 비어 있거나, 태블릿 앱 업데이트(2026.11.19-f 이상)가 필요합니다.'}</p>`);
     return;
   }
   const folders = a.folders || [];
@@ -1143,7 +1143,7 @@ function renderRecords() {
   if ($('#recOv').hidden) return;
   if (!qaConnected() || !records) {
     setHtml($('#recTx'), ''); $('#recCount').textContent = '';
-    setHtml($('#recTree'), `<p class="empty">${!qaConnected() ? '태블릿을 연결하면 태블릿에 저장된 환자 기록이 보입니다.' : '아직 저장된 기록이 없거나, 태블릿 앱 업데이트(2026.11.19-e 이상)가 필요합니다.'}</p>`);
+    setHtml($('#recTree'), `<p class="empty">${!qaConnected() ? '태블릿을 연결하면 태블릿에 저장된 환자 기록이 보입니다.' : '아직 저장된 기록이 없거나, 태블릿 앱 업데이트(2026.11.19-f 이상)가 필요합니다.'}</p>`);
     return;
   }
   setHtml($('#recTx'), TX_ALL.map((t) => `<button type="button" data-tx="${esc(t)}" class="${recTx === t ? 'on' : ''}" aria-pressed="${recTx === t}">${esc(t)}</button>`).join(''));
@@ -1183,11 +1183,12 @@ function openRecord(id) {
     ['치료 항목', (r.treatments || []).join(', ') || '선택 안 함'], ['치료 부위', (r.teeth || []).map((t) => '#' + t).join(' ') || '-'],
     ['희망 셰이드', r.shade || '선택 안 함'], ['메모', r.memo || '(메모 없음)'], ['저장 폴더', String(r.folder || '').split('/').join(' › ')]];
   const shots = r.shots || [];
-  $('#recDetBody').innerHTML = `<div class="det-imgs"><figure><figcaption>원본 (치료 전)</figcaption>${th.before ? `<img id="detBefore" src="${imgUrl(th.before)}" alt="원본">` : '<span class="ph"></span>'}</figure>
+  $('#recDetBody').innerHTML = `<div class="det-imgs"><figure><figcaption>원본 (치료 전)</figcaption>${th.before ? `<img id="detBefore" src="${imgUrl(th.before)}" alt="원본">` : '<span class="ph"></span>'}<button type="button" class="btn sm det-one" data-one="before.jpg">＋ 이 사진만 불러오기</button></figure>
     <figure><figcaption id="detAfterCap">${esc(shots.length ? shots.at(-1).label : '변환 결과 없음')}</figcaption>${th.after ? `<img id="detAfter" src="${imgUrl(th.after)}" alt="결과">` : '<span class="ph"></span>'}
+    ${shots.length ? `<button type="button" class="btn sm det-one" id="detAfterOne" data-one="${esc(shots.at(-1).file || '')}">＋ 이 사진만 불러오기</button>` : ''}
     <small class="p-note" id="detCheck">${shots.length && shots.at(-1).check ? '🦷 ' + esc(shots.at(-1).check) : ''}</small></figure></div>
     <div class="folders" id="detShots">${shots.length > 1 ? shots.map((s, i) => `<button type="button" data-shot="${i}" class="${i === shots.length - 1 ? 'on' : ''}">${esc(s.label)}</button>`).join('') : ''}</div>
-    ${r.hasSmile ? '<h4>😊 미소 미리보기</h4><div class="det-imgs"><figure><figcaption>미소 (치료 전)</figcaption><img id="detSmile" alt="미소 전"></figure><figure><figcaption>미소 미리보기</figcaption><img id="detSmileAfter" alt="미소 후"></figure></div>' : ''}
+    ${r.hasSmile ? '<h4>😊 미소 미리보기</h4><div class="det-imgs"><figure><figcaption>미소 (치료 전)</figcaption><img id="detSmile" alt="미소 전"><button type="button" class="btn sm det-one" data-one="smile_before.jpg">＋ 이 사진만 불러오기</button></figure><figure><figcaption>미소 미리보기</figcaption><img id="detSmileAfter" alt="미소 후"><button type="button" class="btn sm det-one" data-one="smile_after.jpg">＋ 이 사진만 불러오기</button></figure></div>' : ''}
     <small class="p-note" id="detLoading">큰 사진을 태블릿에서 받는 중…</small>
     <dl class="det-info">${info.map(([k, v]) => `<dt>${k}</dt><dd>${esc(v)}</dd>`).join('')}</dl>`;
   openOv('recDetOv');
@@ -1214,11 +1215,20 @@ $('#recReset').addEventListener('click', () => { $('#recQ').value = ''; $('#recD
 $('#recTx').addEventListener('click', (e) => { const b = e.target.closest('[data-tx]'); if (!b) return; recTx = recTx === b.dataset.tx ? null : b.dataset.tx; renderRecords(); });
 $('#recTree').addEventListener('click', (e) => { const b = e.target.closest('[data-rec]'); if (b) openRecord(b.dataset.rec); });
 $('#recDetBody').addEventListener('click', (e) => {
+  // ＋ 이 사진만 불러오기 → 태블릿 시뮬레이터에 한 장씩 (창은 그대로, 이어서 다른 사진도)
+  const one = e.target.closest('[data-one]');
+  if (one && recOpen) {
+    if (!one.dataset.one) return;
+    cmd('recPhoto', { id: recOpen.id, f: one.dataset.one });
+    one.textContent = '✔ 불러옴 (다시 누르면 다시 보냄)';
+    return;
+  }
   const b = e.target.closest('[data-shot]');
   if (!b || !recOpen) return;
   const i = Number(b.dataset.shot), s = (recOpen.shots || [])[i];
   document.querySelectorAll('#detShots button').forEach((x) => x.classList.toggle('on', x === b));
   $('#detAfterCap').textContent = s.label;
+  if ($('#detAfterOne')) { $('#detAfterOne').dataset.one = s.file || ''; $('#detAfterOne').textContent = '＋ 이 사진만 불러오기'; }
   $('#detCheck').textContent = s.check ? '🦷 ' + s.check : '';
   const full = recFull && recFull.id === recOpen.id ? (recFull.shots || [])[i] : null;
   if ($('#detAfter')) $('#detAfter').src = full && full.img ? imgUrl(full.img) : '';
@@ -1413,7 +1423,7 @@ function renderSmile(view) {
   $('#smMake').textContent = sm.busy ? '⏳ 처리 중…' : sm.made ? '😊 다시 입히기' : '😊 미소에 입히기';
   $('#smHint').textContent = !sm.has ? '사진을 올리면 입술 사이 치아를 자동으로 찾아요' : sm.n > 0 ? `치아 영역 ${sm.n}개 선택됨` : '🪄 미소 사진 속 치아를 클릭해 고르세요';
   $('#smMsg').textContent = sm.msg || '';
-  // 🦷 보철 사진 정밀 매칭 (태블릿 앱 2026.11.19-e 이상)
+  // 🦷 보철 사진 정밀 매칭 (태블릿 앱 2026.11.19-f 이상)
   $('#smMatch').hidden = !mm;
   if (mm) {
     const busy = !!mm.busy;

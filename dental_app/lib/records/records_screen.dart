@@ -417,6 +417,24 @@ class _RecordDetailScreenState extends State<RecordDetailScreen> {
     }
   }
 
+  /// 이 사진 한 장만 시뮬레이터로 (화면은 그대로 → 다른 사진도 이어서)
+  Future<void> _loadOne(String file) async {
+    final msg = await RecordPhotoLoader.run(widget.record.id, file);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(msg)));
+  }
+
+  Widget _oneBtn(String file) => Align(
+    alignment: Alignment.centerLeft,
+    child: TextButton.icon(
+      onPressed: _loading ? null : () => _loadOne(file),
+      icon: const Icon(Icons.add_photo_alternate_outlined, size: 18),
+      label: const Text('이 사진만 불러오기'),
+    ),
+  );
+
   Future<void> _delete() async {
     final r = widget.record;
     final ok = await showDialog<bool>(
@@ -470,6 +488,7 @@ class _RecordDetailScreenState extends State<RecordDetailScreen> {
             ),
           ),
         ),
+        _oneBtn(files[i]),
         if (i > 0 && r.shots[i - 1].check.isNotEmpty)
           Padding(
             padding: const EdgeInsets.only(top: 4),
@@ -525,13 +544,13 @@ class _RecordDetailScreenState extends State<RecordDetailScreen> {
                     ),
                     onPressed: _loading ? null : () => _load(),
                     icon: const Icon(Icons.input_rounded),
-                    label: const Text('🖼 시뮬레이터로 불러오기'),
+                    label: const Text('🖼 시뮬레이터로 모두 불러오기'),
                   ),
                 ],
               ),
               const SizedBox(height: 4),
               const Text(
-                '불러오면 원본·변환 결과·상담 내용·미소 사진이 시뮬레이터에 다시 열려요. 😊 미소 미리보기는 시뮬레이터 첫 화면 위쪽 버튼에서 해요.',
+                '[모두 불러오기]: 원본·변환 결과·상담 내용·미소 사진을 한꺼번에. 사진마다 있는 [이 사진만 불러오기]로 한 장씩 골라 불러올 수도 있어요 (불러온 차례대로 비교 목록에).',
                 style: TextStyle(fontSize: 12, color: AppColors.gray500),
               ),
               const SizedBox(height: 12),
@@ -597,6 +616,7 @@ class _RecordDetailScreenState extends State<RecordDetailScreen> {
                                 ),
                               ),
                             ),
+                            _oneBtn(f),
                           ],
                         ),
                       ),

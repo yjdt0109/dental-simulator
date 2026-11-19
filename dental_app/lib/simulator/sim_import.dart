@@ -72,3 +72,17 @@ class CaseLoader {
     return h(c, openSmile: openSmile);
   }
 }
+
+/// 🗂 환자 기록의 사진을 한 장씩 시뮬레이터로 (원본 · N번 결과 · 미소 사진 · 미소 미리보기)
+///   [file]: 기록 폴더 안 파일 이름 (before.jpg, after_1.jpg, smile_before.jpg, smile_after.jpg)
+typedef RecordPhotoFn = Future<String> Function(String recordId, String file);
+
+class RecordPhotoLoader {
+  static RecordPhotoFn? handler;
+
+  static Future<String> run(String recordId, String file) async {
+    final h = handler;
+    if (h == null) return '시뮬레이터 화면이 열려 있지 않아 불러올 수 없습니다.';
+    return h(recordId, file);
+  }
+}

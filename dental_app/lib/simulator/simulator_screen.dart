@@ -55,8 +55,12 @@ class SimulatorHomeScreen extends StatefulWidget {
     super.key,
     required this.profile,
     this.mode = SimMode.expert,
+    this.openRecords = false,
   });
   final ClinicProfile profile;
+
+  /// 시작 화면 [🗂 시뮬레이터 불러오기]: 열자마자 환자 기록 목록
+  final bool openRecords;
 
   /// 개인회원: general(일반) / 사업자회원: expert(전문가용 PRO)
   final SimMode mode;
@@ -97,6 +101,11 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
       if (v != null && mounted) setState(() => _eyeMask = v);
     }).ignore();
     _loadSamples();
+    if (widget.openRecords) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _openRecords();
+      });
+    }
     CastService.instance.addListener(_onCastChanged);
     // PC 에서 손잡이를 움직이거나 메모를 쓰면 태블릿에도 반영
     CastService.instance.onRemotePos = (v) {
@@ -116,6 +125,7 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
     // 🤖 자동 QA · 📚 보관함을 상담 PC 에서도
     SimImport.handler = _importResult;
     CaseLoader.handler = _loadCase;
+    RecordPhotoLoader.handler = _loadRecordPhoto;
     QaRemote.instance
       ..originalOf = (() => _cur?.beforeBytes)
       ..setupOf = _qaSetup
@@ -279,6 +289,9 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
   void dispose() {
     if (SimImport.handler == _importResult) SimImport.handler = null;
     if (CaseLoader.handler == _loadCase) CaseLoader.handler = null;
+    if (RecordPhotoLoader.handler == _loadRecordPhoto) {
+      RecordPhotoLoader.handler = null;
+    }
     _nameCtrl.dispose();
     _memoCtrl.dispose();
     _aiReqCtrl.dispose();
@@ -855,6 +868,91 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
       await Future<void>.delayed(const Duration(milliseconds: 300));
       if (mounted) _openSmile(p);
     }
+    return msg;
+  }
+
+  /// 🗂 기록 사진 한 장 불러오기: 그 기록의 환자(없으면 원본만으로 새로 만듦)에
+  /// 원본은 그대로, N번 결과는 결과 목록에, 미소 사진은 미소 미리보기·비교 목록에 차례대로 추가
+  Future<String> _loadRecordPhoto(String id, String file) async {
+    final store = PatientRecords.instance;
+    await store.ensureLoaded();
+    final r = store.records.where((x) => x.id == id).firstOrNull;
+    if (r == null) return '기록을 찾지 못했습니다.';
+    Future<Uint8List?> read(String f) async {
+      final fh = await store.file(r, f);
+      return await fh.exists() ? fh.readAsBytes() : null;
+    }
+
+    final bytes = await read(file);
+    if (bytes == null) return '사진 파일을 찾지 못했습니다.';
+    var p = _patients.where((x) => x.recordId == id).firstOrNull;
+    if (p == null) {
+      final before = await read('before.jpg') ?? bytes;
+      final im = await decodeImageFromList(before);
+      _uploadSeq++;
+      p = PatientPhoto(
+        id: 'u$_uploadSeq',
+        name: r.name.isEmpty ? '불러온 기록 $_uploadSeq' : r.name,
+        type: r.photoType.isEmpty ? '환자 기록' : '${r.photoType} · 환자 기록',
+        time: '불러옴',
+        beforeBytes: before,
+        imageSize: Size(im.width.toDouble(), im.height.toDouble()),
+      );
+      im.dispose();
+      p.recordId = r.id;
+      p.recordFiles.add('before.jpg');
+      p.consult
+        ..name = r.name
+        ..tx.addAll(r.treatments)
+        ..teeth.addAll(r.teeth)
+        ..shade = r.shade
+        ..memo = r.memo;
+      _patients.insert(0, p);
+    }
+    if (!mounted) return '시뮬레이터 화면이 닫혀 있습니다.';
+    final target = p;
+    if (!identical(_cur, target)) _select(target);
+    final who = r.name.isEmpty ? '기록' : '${r.name} 님';
+    final again = target.recordFiles.contains(file);
+    var what = '원본';
+    if (file == 'smile_before.jpg') {
+      what = '미소 사진';
+      if (!again) await setSmile(target, bytes);
+    } else if (file == 'smile_after.jpg') {
+      what = '미소 미리보기';
+      if (!again) {
+        if (target.smile != null) {
+          target.smileAfter = bytes;
+          target.smileFrom = r.shots.isEmpty ? '' : r.shots.last.label;
+          target.noteSmile();
+        } else {
+          target.addExtra(bytes, '😊 미소 미리보기', sub: '환자 기록 · ${r.dayText}');
+        }
+      }
+    } else if (file != 'before.jpg') {
+      final shot = r.shots.where((s) => s.file == file).firstOrNull;
+      what = shot?.label ?? '변환 결과';
+      if (!again) {
+        target.remember('기록 사진 불러오기');
+        target.addResult(
+          bytes,
+          _settingsKey(),
+          engine: shot?.engine ?? '',
+          check: shot?.check ?? '',
+        );
+      }
+    }
+    target.recordFiles.add(file);
+    if (!mounted) return '시뮬레이터 화면이 닫혀 있습니다.';
+    setState(() {
+      if (target.results.isNotEmpty) target.editing = false;
+      _pos = 0.5;
+    });
+    _smilePublish(target);
+    final msg = again
+        ? '🗂 $who $what 은(는) 이미 불러왔습니다'
+        : '🗂 $who $what 을(를) 불러왔습니다 · 이어서 다른 사진도 한 장씩 불러올 수 있어요';
+    _toast(msg);
     return msg;
   }
 

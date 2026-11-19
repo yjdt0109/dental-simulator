@@ -4,9 +4,9 @@
 > "HANDOFF.md 읽고 이어서 작업해줘"라고 하면 됩니다. 답변은 항상 한글로.
 
 ## 1. 현재 버전
-- 태블릿 앱(안드로이드 APK, Flutter): **2026.11.19-e** (`lib/cast/cast_service.dart`의 `appVersion`)
-- 상담 PC 모니터(웹, Netlify에 폴더째 끌어다 놓기): **v3.27** (`monitor-web/`)
-- 자동 테스트: 127개 모두 통과 (`flutter test`)
+- 태블릿 앱(안드로이드 APK, Flutter): **2026.11.19-f** (`lib/cast/cast_service.dart`의 `appVersion`)
+- 상담 PC 모니터(웹, Netlify에 폴더째 끌어다 놓기): **v3.28** (`monitor-web/`)
+- 자동 테스트: 128개 모두 통과 (`flutter test`)
 
 ## 2. 구성
 - `dental_app/` — Flutter 앱 (lib, test, android, web)
@@ -26,9 +26,12 @@
 8. **😊 미소 미리보기**: 미소 사진의 입술 사이만 변환 치아로(나노바나나 2장 입력 + 입술·얼굴 원본 고정), 메인 화면 미소 비교, PC 패널
 9. **🦷 보철 사진 정밀 매칭** (😊 미소 미리보기 화면 안): 1번 자연 미소 + 2번 개구기 보철 사진 → MediaPipe 얼굴 특징점(눈동자·코끝, 눈 가린 사진은 코 기준)으로 2번을 1번에 맞춤(Kotlin `DentalAlignmentHelper.kt`, 채널 `bna/dental_align`) → 입술 안쪽 마스크·보철 치아만 잘라 합성 → FLUX Fill(빈 곳만) → 나노바나나 Pro 리터칭(실패 시 2.1) → 입술·얼굴 원본 고정. Dart: `lib/ai/smile_match.dart`. APK 127MB(모델 3.8MB 포함). **실제 기기·실제 AI로는 아직 시험 안 함**. PC(v3.25)에서도 😊 미소 미리보기 창 아래 칸에서 2번 올리기/지금 결과 쓰기/시작, ①②③ 단계 탭, [이 사진을 미소 비교에 쓰기] (명령: matchPhoto·matchUseAfter·matchRun·matchPick, 계산은 태블릿)
 10. **비교 목록 정리 (2026.11.19-e)**: 첫 화면(변환 전)에도 [이전 변환 불러오기](환자 기록) · [😊 미소 미리보기] 버튼. 미소 미리보기는 변환 전에도 열림(보철 정밀 매칭 가능), 환자 기록 화면에서는 미소 버튼 뺌. 미소 사진은 갤러리 여러 장 / 🗂 환자 기록에서 여러 장(누른 차례) / PC 여러 장·기록에서 불러오기(`smileFromRec`). 불러온 사진은 모두 `PatientPhoto.extras`(번호 -1, -2 …)로 브리핑 왼쪽 '비교할 사진' 목록 끝에 차례대로 + [사진 추가]. 브리핑에서는 변환 전이라도 목록에서 1~2장 골라 비교. PC 에는 목록 위치 번호(items/subs/cmp)로 보냄
-11. **상담 PC**: 위 기능 대부분을 마우스로 (SAM, 기준점, 크기 조절, QA, 보관함, 기록, 미소)
+11. **기록 사진 한 장씩 불러오기 (2026.11.19-f)**: 기록 상세(태블릿·PC)의 사진마다 [이 사진만 불러오기] → 그 기록의 환자(없으면 원본만으로 만듦)에 원본/결과/미소/미소 미리보기를 한 장씩 차례대로 (`RecordPhotoLoader`, PC 명령 `recPhoto {id,f}`). 기존 버튼은 [시뮬레이터로 모두 불러오기]. 홈(시작 화면)에 [🗂 시뮬레이터 불러오기] 카드 → 시뮬레이터를 열며 바로 환자 기록 목록
+12. **상담 PC**: 위 기능 대부분을 마우스로 (SAM, 기준점, 크기 조절, QA, 보관함, 기록, 미소)
 
 ## 4. 마지막 대화에서 논의 중이던 것 (다음 할 일)
+- **사용자 지적(결정 대기)**: [😊 미소에 입히기] 결과 치아가 변환(보철) 사진 치아와 안 닮음. 제안: ① 정밀 매칭 [지금 결과 쓰기]로 시험 ② 변환 치아만 잘라 보내기 + 결과 치아 숫자 검사·재시도 ③ 미소에 입히기를 정밀 매칭 방식으로 교체
+- 브리핑 목록 '짝 자동 비교'는 사용자가 중지시킴 → 브랜치 `wip-pair-compare` 에 보관만 (main 에 없음)
 - **먼저**: 보철 정밀 매칭을 실제 태블릿에서 시험 → 정렬 오차·결과 확인. 이어서 제안(결정 대기): 수동 3점 미세조정 화면, FLUX Kontext 확인 후 엔진 비교, 하악 치아/스티커 기준 정렬
 사용자 지적: 살짝 웃는 미소 사진(잇몸 안 보이고 치아 일부만 보임)을 **교정**으로 변환하면 잇몸까지 새로 만들고 과하게 가지런해져서 실패.
 제안했던 순서 (사용자 결정 대기):
@@ -44,8 +47,8 @@ flutter pub get
 flutter test
 flutter build apk --release   # build/app/outputs/flutter-apk/app-release.apk
 ```
-- PC 모니터: `monitor-web` 폴더를 Netlify에 그대로 올림 (사용자에게는 `monitor-web-v3.xx.zip` 으로 묶어 전달). 새 버전 만들 때 index.html의 버전(3.27)을 올림
-- 버전 올리기: `lib/cast/cast_service.dart`의 `appVersion` + PC `app.js` 안의 "2026.11.19-e 이상" 문구
+- PC 모니터: `monitor-web` 폴더를 Netlify에 그대로 올림 (사용자에게는 `monitor-web-v3.xx.zip` 으로 묶어 전달). 새 버전 만들 때 index.html의 버전(3.28)을 올림
+- 버전 올리기: `lib/cast/cast_service.dart`의 `appVersion` + PC `app.js` 안의 "2026.11.19-f 이상" 문구
 
 ## 6. 주요 파일
 - `lib/simulator/simulator_screen.dart` — 메인 화면(변환·PC 명령 처리 `_onRemoteCmd`·상태 전송 `_pushCast`)

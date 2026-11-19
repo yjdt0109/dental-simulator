@@ -388,3 +388,4 @@ table.rank td { padding: 8px; border-top: 1px solid var(--line); }
 #smMatchMsg { white-space: pre-line; }
 #smMTabs button { font-size: 12.5px; padding: 7px 4px; white-space: nowrap; }
 #smMatchMsg, #smMsg { overflow-wrap: anywhere; font-size: 13px; }
+.det-one { margin-top: 6px; align-self: flex-start; }

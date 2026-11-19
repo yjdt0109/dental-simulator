@@ -391,6 +391,14 @@ class QaRemote {
           ),
         );
         return true;
+      case 'recPhoto': // PC 🗂 기록 사진 한 장만 시뮬레이터로 {id, f}
+        if (v is Map && v['id'] != null && v['f'] is String) {
+          final f = '${v['f']}';
+          if (RegExp(r'^[A-Za-z0-9_]+\.jpg$').hasMatch(f)) {
+            await RecordPhotoLoader.run('${v['id']}', f);
+          }
+        }
+        return true;
       case 'recDel':
         final r = PatientRecords.instance.records
             .where((x) => x.id == '$v')

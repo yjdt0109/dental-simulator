@@ -15,12 +15,13 @@ class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key, required this.member});
   final MemberProfile member;
 
-  void _openSimulator(BuildContext context) {
+  void _openSimulator(BuildContext context, {bool records = false}) {
     Navigator.of(context).push(
       smoothRoute(
         SimulatorHomeScreen(
           profile: member.toClinicProfile(),
           mode: member.simMode,
+          openRecords: records,
         ),
       ),
     );
@@ -76,6 +77,14 @@ class HomeScreen extends StatelessWidget {
         action: '시작하기',
         onTap: () => _openSimulator(context),
       ),
+      // 🗂 예전에 변환한 환자 기록을 시뮬레이터로 (모두 또는 사진 한 장씩)
+      _ServiceCard(
+        icon: Icons.folder_open_outlined,
+        title: '시뮬레이터 불러오기',
+        desc: '저장된 환자 기록에서 원본·변환 결과·미소 사진을 모두 또는 한 장씩 불러와 이어서 상담해요',
+        action: '기록 열기',
+        onTap: () => _openSimulator(context, records: true),
+      ),
       _ServiceCard(
         icon: m.isBusiness
             ? Icons.precision_manufacturing_outlined
@@ -84,11 +93,6 @@ class HomeScreen extends StatelessWidget {
         desc: '${m.region.short} 주변 ${m.isBusiness ? '치과기공소' : '치과'} 찾기',
         action: '보기',
         onTap: () => _openNearby(context),
-      ),
-      const _ServiceCard(
-        icon: Icons.add_rounded,
-        title: '추가 서비스 준비 중',
-        desc: '새로운 서비스가 곧 추가됩니다',
       ),
       const _ServiceCard(
         icon: Icons.add_rounded,

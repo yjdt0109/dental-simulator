@@ -214,6 +214,7 @@ class PatientPhoto {
   ToothMaskSet? smileSet; // 입술 사이 치아 영역
   Uint8List? smileAfter; // 미소에 입힌 결과
   String smileFrom = ''; // 어떤 결과를 입혔는지 (예: 김민수 2번)
+  final Set<String> recordFiles = {}; // 기록에서 한 장씩 불러온 파일 (같은 사진 두 번 안 넣기)
   String? recordId; // 🗂 저장된(또는 불러온) 환자 기록 — 미소 사진도 그 폴더에 저장
 
   /// 변환 결과 1번, 2번, … (원본은 따로 beforeBytes). 마지막 것이 지금 After.
