@@ -166,7 +166,7 @@ void main() {
       expect(find.text('원본 (치료 전)'), findsOneWidget);
       expect(find.text('김민수 2번 (B)'), findsWidgets);
       expect(find.textContaining('🦷 ✓ 무삭제 검사 통과'), findsOneWidget);
-      expect(find.text('🖼 시뮬레이터로 모두 불러오기'), findsOneWidget);
+      expect(find.text('🖼 시뮬레이터로 모두 불러오기'), findsNothing);
       expect(find.text('😊 미소 미리보기'), findsNothing); // 미소 미리보기는 시뮬레이터 첫 화면에서
       await t.scrollUntilVisible(
         find.textContaining('2026-11-18 › 김민수 › 1430_'),

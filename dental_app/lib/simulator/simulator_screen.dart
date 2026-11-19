@@ -689,10 +689,8 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
 
   _ViewMode get _mode {
     final p = _cur!;
-    // 브리핑: 변환 결과나 불러온 사진(미소 등)이 있으면 왼쪽 목록에서 골라 비교
-    if (_briefing && (p.results.isNotEmpty || p.extras.isNotEmpty)) {
-      return _ViewMode.slider;
-    }
+    // 브리핑: 항상 왼쪽 '비교할 사진' 목록에서 골라 비교 (기록 사진도 여기서 추가)
+    if (_briefing) return _ViewMode.slider;
     if (p.editing || p.afterBytes == null) return _ViewMode.edit;
     return _briefing ? _ViewMode.slider : _ViewMode.stack;
   }
@@ -871,8 +869,9 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
     return msg;
   }
 
-  /// 🗂 기록 사진 한 장 불러오기: 그 기록의 환자(없으면 원본만으로 새로 만듦)에
-  /// 원본은 그대로, N번 결과는 결과 목록에, 미소 사진은 미소 미리보기·비교 목록에 차례대로 추가
+  /// 🗂 기록 사진 한 장 불러오기 → 지금 화면의 '비교할 사진' 목록 끝에 (불러온 차례대로).
+  /// 지금 화면이 예시 사진이면 그 기록의 환자(원본·상담 내용)를 만들어 거기에.
+  /// 같은 기록의 환자면 변환 결과는 결과로, 미소 사진은 미소 미리보기로 들어감.
   Future<String> _loadRecordPhoto(String id, String file) async {
     final store = PatientRecords.instance;
     await store.ensureLoaded();
@@ -885,64 +884,65 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
 
     final bytes = await read(file);
     if (bytes == null) return '사진 파일을 찾지 못했습니다.';
-    var p = _patients.where((x) => x.recordId == id).firstOrNull;
-    if (p == null) {
-      final before = await read('before.jpg') ?? bytes;
-      final im = await decodeImageFromList(before);
-      _uploadSeq++;
-      p = PatientPhoto(
-        id: 'u$_uploadSeq',
-        name: r.name.isEmpty ? '불러온 기록 $_uploadSeq' : r.name,
-        type: r.photoType.isEmpty ? '환자 기록' : '${r.photoType} · 환자 기록',
-        time: '불러옴',
-        beforeBytes: before,
-        imageSize: Size(im.width.toDouble(), im.height.toDouble()),
-      );
-      im.dispose();
-      p.recordId = r.id;
-      p.recordFiles.add('before.jpg');
-      p.consult
-        ..name = r.name
-        ..tx.addAll(r.treatments)
-        ..teeth.addAll(r.teeth)
-        ..shade = r.shade
-        ..memo = r.memo;
-      _patients.insert(0, p);
+    final who = r.name.isEmpty ? '기록' : r.name;
+    final shot = r.shots.where((s) => s.file == file).firstOrNull;
+    final what = switch (file) {
+      'before.jpg' => '$who 원본',
+      'smile_before.jpg' => '😊 $who 미소',
+      'smile_after.jpg' => '😊 $who 미소 미리보기',
+      _ => shot?.label ?? '$who 변환 결과',
+    };
+    var p = _cur;
+    if (p == null || !p.isUpload) {
+      // 예시 사진 화면 → 그 기록의 환자로
+      p = _patients.where((x) => x.recordId == id).firstOrNull;
+      if (p == null) {
+        final before = await read('before.jpg') ?? bytes;
+        final im = await decodeImageFromList(before);
+        _uploadSeq++;
+        p = PatientPhoto(
+          id: 'u$_uploadSeq',
+          name: r.name.isEmpty ? '불러온 기록 $_uploadSeq' : r.name,
+          type: r.photoType.isEmpty ? '환자 기록' : '${r.photoType} · 환자 기록',
+          time: '불러옴',
+          beforeBytes: before,
+          imageSize: Size(im.width.toDouble(), im.height.toDouble()),
+        );
+        im.dispose();
+        p.recordId = r.id;
+        p.consult
+          ..name = r.name
+          ..tx.addAll(r.treatments)
+          ..teeth.addAll(r.teeth)
+          ..shade = r.shade
+          ..memo = r.memo;
+        _patients.insert(0, p);
+      }
     }
     if (!mounted) return '시뮬레이터 화면이 닫혀 있습니다.';
     final target = p;
     if (!identical(_cur, target)) _select(target);
-    final who = r.name.isEmpty ? '기록' : '${r.name} 님';
-    final again = target.recordFiles.contains(file);
-    var what = '원본';
-    if (file == 'smile_before.jpg') {
-      what = '미소 사진';
-      if (!again) await setSmile(target, bytes);
-    } else if (file == 'smile_after.jpg') {
-      what = '미소 미리보기';
-      if (!again) {
-        if (target.smile != null) {
-          target.smileAfter = bytes;
-          target.smileFrom = r.shots.isEmpty ? '' : r.shots.last.label;
-          target.noteSmile();
-        } else {
-          target.addExtra(bytes, '😊 미소 미리보기', sub: '환자 기록 · ${r.dayText}');
-        }
-      }
-    } else if (file != 'before.jpg') {
-      final shot = r.shots.where((s) => s.file == file).firstOrNull;
-      what = shot?.label ?? '변환 결과';
-      if (!again) {
+    final again = target.hasPhoto(bytes);
+    if (!again) {
+      final mine = target.recordId == id;
+      if (mine && shot != null) {
         target.remember('기록 사진 불러오기');
         target.addResult(
           bytes,
           _settingsKey(),
-          engine: shot?.engine ?? '',
-          check: shot?.check ?? '',
+          engine: shot.engine,
+          check: shot.check,
         );
+      } else if (mine && file == 'smile_before.jpg') {
+        await setSmile(target, bytes);
+      } else if (mine && file == 'smile_after.jpg' && target.smile != null) {
+        target.smileAfter = bytes;
+        target.smileFrom = r.shots.isEmpty ? '' : r.shots.last.label;
+        target.noteSmile();
+      } else {
+        target.addExtra(bytes, what, sub: '환자 기록 · ${r.dayText} ${r.time}');
       }
     }
-    target.recordFiles.add(file);
     if (!mounted) return '시뮬레이터 화면이 닫혀 있습니다.';
     setState(() {
       if (target.results.isNotEmpty) target.editing = false;
@@ -950,10 +950,24 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
     });
     _smilePublish(target);
     final msg = again
-        ? '🗂 $who $what 은(는) 이미 불러왔습니다'
-        : '🗂 $who $what 을(를) 불러왔습니다 · 이어서 다른 사진도 한 장씩 불러올 수 있어요';
+        ? '🗂 $what 은(는) 이미 목록에 있습니다'
+        : '🗂 $what 을(를) 비교 목록에 불러왔습니다 · 이어서 다른 사진도 한 장씩 불러올 수 있어요';
     _toast(msg);
     return msg;
+  }
+
+  /// 비교 목록에서 사진 빼기 (원본 제외)
+  void _removePhoto(PatientPhoto p, int n) {
+    final label = _label(p, n);
+    String? done;
+    setState(() => done = p.removePhoto(n, label));
+    if (done == null) return;
+    _smilePublish(p);
+    _toast(
+      n > 0
+          ? '🗑 \'$label\' 을(를) 목록에서 뺐습니다 · [이전으로]로 되돌릴 수 있어요'
+          : '🗑 \'$label\' 을(를) 목록에서 뺐습니다',
+    );
   }
 
   ModalRoute<Object?>? _myRoute;
@@ -1208,6 +1222,19 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
         _smileRemoteMake(p);
       case 'smileView':
         setState(() => _smileView = v == true && p.smileAfter != null);
+      case 'cmpRemove': // PC 비교 목록 ✕ (목록 위치 번호)
+        if (v is int && v > 0 && v < p.listOrder.length) {
+          _removePhoto(p, p.listOrder[v]);
+        }
+      case 'extraPhoto': // PC 비교 목록에 사진 올리기
+        if (v is String && v.length < 12000000) {
+          final b = base64Decode(v);
+          if (!p.hasPhoto(b)) {
+            final k = p.extras.where((e) => e.sub == '불러온 사진').length + 1;
+            setState(() => p.addExtra(b, '사진 $k', sub: '불러온 사진'));
+            _smilePublish(p);
+          }
+        }
       case 'smileFromRec': // PC 환자 기록 → 미소 사진(+미소 미리보기)을 비교 목록에, 미소 사진은 미리보기용으로
         if (v is String) _smileFromRecord(p, v);
       case 'matchPhoto': // PC 🦷 보철 사진(2번) 올리기
@@ -2447,7 +2474,7 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
                 Icons.folder_open_outlined,
                 color: AppColors.blue,
               ),
-              title: const Text('🗂 환자 기록에서 (여러 장)'),
+              title: const Text('🗂 환자 기록 사진 (한 장씩 골라도 돼요)'),
               onTap: () => Navigator.pop(ctx, 'rec'),
             ),
             ListTile(
@@ -2469,6 +2496,7 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
       final got = await pickRecordPhotos(context);
       if (got == null) return;
       for (final g in got) {
+        if (p.hasPhoto(g.bytes)) continue;
         p.addExtra(g.bytes, g.label, sub: g.sub);
         added++;
       }
@@ -2923,6 +2951,21 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
                           ),
                         ),
                       ),
+                      if (n != 0)
+                        SizedBox(
+                          width: 24,
+                          height: 24,
+                          child: IconButton(
+                            padding: EdgeInsets.zero,
+                            tooltip: '목록에서 빼기',
+                            onPressed: () => _removePhoto(p, n),
+                            icon: const Icon(
+                              Icons.close_rounded,
+                              size: 16,
+                              color: AppColors.gray500,
+                            ),
+                          ),
+                        ),
                     ],
                   ),
                 ],
@@ -2963,7 +3006,7 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
                     Icons.add_photo_alternate_outlined,
                     size: 18,
                   ),
-                  label: const Text('사진 추가', style: TextStyle(fontSize: 12)),
+                  label: const Text('기록·사진 추가', style: TextStyle(fontSize: 12)),
                 ),
               ],
             ),

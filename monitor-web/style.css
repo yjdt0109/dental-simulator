@@ -389,3 +389,7 @@ table.rank td { padding: 8px; border-top: 1px solid var(--line); }
 #smMTabs button { font-size: 12.5px; padding: 7px 4px; white-space: nowrap; }
 #smMatchMsg, #smMsg { overflow-wrap: anywhere; font-size: 13px; }
 .det-one { margin-top: 6px; align-self: flex-start; }
+.pick { position: relative; }
+.pick-del { position: absolute; right: 4px; top: 4px; width: 22px; height: 22px; border-radius: 50%; background: rgba(0,0,0,.6); color: #fff; font-style: normal; font-size: 12px; display: grid; place-items: center; }
+.pick-del:hover { background: #d33; }
+.pick-add { display: grid; gap: 6px; margin-top: 8px; }

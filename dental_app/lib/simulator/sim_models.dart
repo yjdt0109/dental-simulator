@@ -5,6 +5,7 @@ import 'package:image/image.dart' as img;
 import '../ai/smile.dart' show ToothMaskSet;
 import '../ai/tooth_select.dart' show ToothSel;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 /// 셰이드 칩: [chip] 칩 색, [tooth] 예시 사진 After 치아 색,
@@ -214,7 +215,6 @@ class PatientPhoto {
   ToothMaskSet? smileSet; // 입술 사이 치아 영역
   Uint8List? smileAfter; // 미소에 입힌 결과
   String smileFrom = ''; // 어떤 결과를 입혔는지 (예: 김민수 2번)
-  final Set<String> recordFiles = {}; // 기록에서 한 장씩 불러온 파일 (같은 사진 두 번 안 넣기)
   String? recordId; // 🗂 저장된(또는 불러온) 환자 기록 — 미소 사진도 그 폴더에 저장
 
   /// 변환 결과 1번, 2번, … (원본은 따로 beforeBytes). 마지막 것이 지금 After.
@@ -233,6 +233,30 @@ class PatientPhoto {
     }
     extras.add(ExtraPhoto(bytes, label, sub: sub));
     return -extras.length;
+  }
+
+  /// 비교 목록에서 사진 빼기 (원본은 못 뺌). 변환 결과는 [이전으로]로 되돌릴 수 있음. 뺀 사진 이름을 돌려줌
+  String? removePhoto(int n, String label) {
+    if (n > 0 && n <= results.length) {
+      remember('사진 빼기');
+      results = [...results]..removeAt(n - 1);
+      if (results.isEmpty) editing = true;
+    } else if (n < 0 && -n <= extras.length) {
+      extras.removeAt(-n - 1);
+    } else {
+      return null;
+    }
+    sel = [];
+    return label;
+  }
+
+  /// 같은 내용의 사진이 이미 목록(원본·결과·불러온 사진)에 있는지
+  bool hasPhoto(Uint8List b) {
+    bool same(Uint8List a) =>
+        identical(a, b) || (a.length == b.length && listEquals(a, b));
+    return same(beforeBytes) ||
+        results.any((r) => same(r.bytes)) ||
+        extras.any((e) => same(e.bytes));
   }
 
   /// 지금 미소 사진·미소 미리보기를 비교 목록에 (이미 있으면 그대로)

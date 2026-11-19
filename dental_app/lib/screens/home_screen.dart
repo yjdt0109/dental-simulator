@@ -81,7 +81,7 @@ class HomeScreen extends StatelessWidget {
       _ServiceCard(
         icon: Icons.folder_open_outlined,
         title: '시뮬레이터 불러오기',
-        desc: '저장된 환자 기록에서 원본·변환 결과·미소 사진을 모두 또는 한 장씩 불러와 이어서 상담해요',
+        desc: '저장된 환자 기록에서 원본·변환 결과·미소 사진을 한 장씩 불러와 비교·상담해요',
         action: '기록 열기',
         onTap: () => _openSimulator(context, records: true),
       ),

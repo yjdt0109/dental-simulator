@@ -381,42 +381,6 @@ class _RecordDetailScreenState extends State<RecordDetailScreen> {
 
   bool _loading = false;
 
-  /// 🖼 이 기록을 시뮬레이터로 다시 불러오기 ([smile]: 불러온 뒤 미소 미리보기 바로 열기)
-  Future<void> _load({bool smile = false}) async {
-    final r = widget.record;
-    setState(() => _loading = true);
-    final f = await readRecordFiles(r);
-    if (!mounted) return;
-    if (f == null) {
-      setState(() => _loading = false);
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('기록 사진을 찾지 못했습니다.')));
-      return;
-    }
-    final msg = await CaseLoader.run(
-      LoadedCase(
-        before: f.before,
-        results: f.results,
-        name: r.name,
-        treatments: r.treatments,
-        teeth: r.teeth,
-        shade: r.shade,
-        memo: r.memo,
-        photoType: r.photoType,
-        smile: f.smile,
-        smileAfter: f.smileAfter,
-        smileFrom: r.shots.isEmpty ? '' : r.shots.last.label,
-        recordId: r.id,
-      ),
-      openSmile: smile,
-    );
-    if (!mounted) return;
-    setState(() => _loading = false);
-    if (CaseLoader.handler == null) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
-    }
-  }
-
   /// 이 사진 한 장만 시뮬레이터로 (화면은 그대로 → 다른 사진도 이어서)
   Future<void> _loadOne(String file) async {
     final msg = await RecordPhotoLoader.run(widget.record.id, file);
@@ -534,23 +498,9 @@ class _RecordDetailScreenState extends State<RecordDetailScreen> {
           child: ListView(
             padding: const EdgeInsets.all(16),
             children: [
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  FilledButton.icon(
-                    style: FilledButton.styleFrom(
-                      minimumSize: const Size(0, 46),
-                    ),
-                    onPressed: _loading ? null : () => _load(),
-                    icon: const Icon(Icons.input_rounded),
-                    label: const Text('🖼 시뮬레이터로 모두 불러오기'),
-                  ),
-                ],
-              ),
               const SizedBox(height: 4),
               const Text(
-                '[모두 불러오기]: 원본·변환 결과·상담 내용·미소 사진을 한꺼번에. 사진마다 있는 [이 사진만 불러오기]로 한 장씩 골라 불러올 수도 있어요 (불러온 차례대로 비교 목록에).',
+                '사진마다 있는 [이 사진만 불러오기]로 한 장씩 시뮬레이터의 \'비교할 사진\' 목록에 불러와요 (불러온 차례대로).',
                 style: TextStyle(fontSize: 12, color: AppColors.gray500),
               ),
               const SizedBox(height: 12),

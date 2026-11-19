@@ -107,7 +107,7 @@ function render() {
   const tabletView = state.view || 'edit';
   if (tabletView !== lastTabletView) { lastTabletView = tabletView; localView = null; }
   const items = Array.isArray(state.items) ? state.items.map(String) : ['원본'];
-  const subs = Array.isArray(state.subs) ? state.subs.map(String) : []; // 태블릿 2026.11.19-f 이상: 불러온 사진 설명
+  const subs = Array.isArray(state.subs) ? state.subs.map(String) : []; // 태블릿 2026.11.19-g 이상: 불러온 사진 설명
   const cmp = Array.isArray(state.cmp) ? state.cmp.filter((n) => Number.isInteger(n) && n < items.length) : [0];
   const hasAfterShown = tabletView !== 'edit' && images && images.after;
   // one: 비교 목록에서 1장만 고름 → 그 사진만 크게
@@ -121,7 +121,7 @@ function render() {
   if (view === 'one') lbl('#lblSingle', cmp[0]); else { const e = $('#lblSingle'); e.querySelector('b').textContent = '원본'; e.querySelector('span').textContent = '치료 전'; e.classList.remove('after'); }
   if (cmp.length === 2) { lbl('#lblL', cmp[0]); lbl('#lblR', cmp[1]); lbl('#lblSB', cmp[0]); lbl('#lblSA', cmp[1]); }
   $('#lblR').classList.remove('after'); $('#lblL').classList.toggle('after', !!cmp[0] && cmp.length === 2);
-  renderPicker(items, cmp, tabletView !== 'edit' && items.length > 1);
+  renderPicker(items, cmp, tabletView !== 'edit' && (items.length > 1 || !!state.briefing));
   curView = view;
 
   // 사진 (다른 환자 사진이면 확대 초기화)
@@ -236,10 +236,13 @@ function renderPicker(items, cmp, on) {
     const src = thumbs[n] ? 'data:image/jpeg;base64,' + thumbs[n] : '';
     return `<button type="button" class="pick${sel ? ' on' : ''}" data-n="${n}" aria-pressed="${sel}">`
       + (src ? `<img src="${src}" alt="">` : '<i class="noimg"></i>')
-      + `<span><b>${sel ? '☑' : '☐'}</b> ${esc(label)}</span></button>`;
+      + `<span><b>${sel ? '☑' : '☐'}</b> ${esc(label)}</span>`
+      + (n > 0 ? `<i class="pick-del" data-del="${n}" title="목록에서 빼기">✕</i>` : '') + '</button>';
   }).join('');
 }
 $('#pickList').addEventListener('click', (e) => {
+  const del = e.target.closest('[data-del]');
+  if (del) { cmd('cmpRemove', Number(del.dataset.del)); return; } // ✕ 목록에서 빼기
   const b = e.target.closest('.pick'); if (!b) return;
   cmd('cmpToggle', Number(b.dataset.n));
 });
@@ -902,7 +905,7 @@ function renderQa() {
   const running = !!q.running;
   const newApp = !!qa;
   const warn = !qaConnected() ? '태블릿이 연결되어 있지 않습니다. QR 로 연결해 주세요.'
-    : !newApp ? '태블릿 앱을 최신 버전(2026.11.19-f 이상)으로 업데이트해야 자동 QA 를 PC 에서 쓸 수 있습니다.'
+    : !newApp ? '태블릿 앱을 최신 버전(2026.11.19-g 이상)으로 업데이트해야 자동 QA 를 PC 에서 쓸 수 있습니다.'
     : !(images && images.before) ? '태블릿에서 환자 사진을 먼저 올려 주세요 (PC 의 [사진 올리기] 도 가능).'
     : q.ready === false ? '태블릿의 AI 연결이 준비되지 않았습니다 (태블릿 [API 키 설정] 확인).' : '';
   $('#qaWarn').hidden = !warn; $('#qaWarn').textContent = warn;
@@ -1026,7 +1029,7 @@ function renderArchive() {
   const a = archive;
   if (!qaConnected() || !a) {
     setHtml($('#archFolders'), '');
-    setHtml($('#archGrid'), `<p class="empty">${!qaConnected() ? '태블릿을 연결하면 태블릿에 저장된 보관함이 보입니다.' : '보관함이 비어 있거나, 태블릿 앱 업데이트(2026.11.19-f 이상)가 필요합니다.'}</p>`);
+    setHtml($('#archGrid'), `<p class="empty">${!qaConnected() ? '태블릿을 연결하면 태블릿에 저장된 보관함이 보입니다.' : '보관함이 비어 있거나, 태블릿 앱 업데이트(2026.11.19-g 이상)가 필요합니다.'}</p>`);
     return;
   }
   const folders = a.folders || [];
@@ -1143,7 +1146,7 @@ function renderRecords() {
   if ($('#recOv').hidden) return;
   if (!qaConnected() || !records) {
     setHtml($('#recTx'), ''); $('#recCount').textContent = '';
-    setHtml($('#recTree'), `<p class="empty">${!qaConnected() ? '태블릿을 연결하면 태블릿에 저장된 환자 기록이 보입니다.' : '아직 저장된 기록이 없거나, 태블릿 앱 업데이트(2026.11.19-f 이상)가 필요합니다.'}</p>`);
+    setHtml($('#recTree'), `<p class="empty">${!qaConnected() ? '태블릿을 연결하면 태블릿에 저장된 환자 기록이 보입니다.' : '아직 저장된 기록이 없거나, 태블릿 앱 업데이트(2026.11.19-g 이상)가 필요합니다.'}</p>`);
     return;
   }
   setHtml($('#recTx'), TX_ALL.map((t) => `<button type="button" data-tx="${esc(t)}" class="${recTx === t ? 'on' : ''}" aria-pressed="${recTx === t}">${esc(t)}</button>`).join(''));
@@ -1233,11 +1236,8 @@ $('#recDetBody').addEventListener('click', (e) => {
   const full = recFull && recFull.id === recOpen.id ? (recFull.shots || [])[i] : null;
   if ($('#detAfter')) $('#detAfter').src = full && full.img ? imgUrl(full.img) : '';
 });
-$('#recLoad').addEventListener('click', () => {
-  if (!recOpen) return;
-  cmd('recLoad', recOpen.id);
-  closeOv('recDetOv'); closeOv('recOv');
-});
+// 비교 목록 [🗂 기록 사진] → 기록을 열고 사진 아래 [＋ 이 사진만 불러오기]
+$('#pickRec').addEventListener('click', () => { openOv('recOv'); renderRecords(); });
 // 😊 이 기록의 미소 사진만 지금 환자의 비교 목록 + 미소 미리보기로 (여러 번 누르면 차례대로 쌓임)
 $('#recSmile').addEventListener('click', () => {
   if (!recOpen) return;
@@ -1423,7 +1423,7 @@ function renderSmile(view) {
   $('#smMake').textContent = sm.busy ? '⏳ 처리 중…' : sm.made ? '😊 다시 입히기' : '😊 미소에 입히기';
   $('#smHint').textContent = !sm.has ? '사진을 올리면 입술 사이 치아를 자동으로 찾아요' : sm.n > 0 ? `치아 영역 ${sm.n}개 선택됨` : '🪄 미소 사진 속 치아를 클릭해 고르세요';
   $('#smMsg').textContent = sm.msg || '';
-  // 🦷 보철 사진 정밀 매칭 (태블릿 앱 2026.11.19-f 이상)
+  // 🦷 보철 사진 정밀 매칭 (태블릿 앱 2026.11.19-g 이상)
   $('#smMatch').hidden = !mm;
   if (mm) {
     const busy = !!mm.busy;
@@ -1466,7 +1466,7 @@ async function sendPhoto(e, cmdName, msgEl, what) {
   const fs = [...(e.target.files || [])];
   e.target.value = '';
   // 여러 장: 고른 차례대로 하나씩 (태블릿 비교 목록에 차례대로 쌓임)
-  for (const f of (cmdName === 'smilePhoto' ? fs : fs.slice(0, 1))) await sendOne(f, cmdName, msgEl, what);
+  for (const f of (cmdName === 'matchPhoto' ? fs.slice(0, 1) : fs)) await sendOne(f, cmdName, msgEl, what);
 }
 async function sendOne(f, cmdName, msgEl, what) {
   try {
@@ -1483,6 +1483,7 @@ async function sendOne(f, cmdName, msgEl, what) {
   }
 }
 $('#smFile').addEventListener('change', (e) => sendPhoto(e, 'smilePhoto', '#smMsg', '미소 사진'));
+$('#pickFile').addEventListener('change', (e) => sendPhoto(e, 'extraPhoto', '#pickMsg', '사진'));
 $('#smP2File').addEventListener('change', (e) => sendPhoto(e, 'matchPhoto', '#smMatchMsg', '보철 사진'));
 
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});

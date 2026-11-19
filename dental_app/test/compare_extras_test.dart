@@ -148,7 +148,17 @@ void main() {
     });
     await _settle(t);
     expect(find.byType(SliderCompare), findsOneWidget);
-    expect(find.text('사진 추가'), findsOneWidget);
+    await t.scrollUntilVisible(
+      find.text('기록·사진 추가'),
+      200,
+      scrollable: find
+          .descendant(
+            of: find.byType(ListView),
+            matching: find.byType(Scrollable),
+          )
+          .first,
+    );
+    expect(find.text('기록·사진 추가'), findsOneWidget);
     expect(t.takeException(), isNull);
   });
 
