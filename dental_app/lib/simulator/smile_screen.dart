@@ -8,6 +8,7 @@ import '../ai/smile.dart';
 import '../ai/smile_match.dart';
 import '../app_theme.dart';
 import '../privacy/mouth_finder.dart';
+import '../records/record_photo_picker.dart';
 import 'compare_viewer.dart';
 import 'sim_models.dart';
 
@@ -16,18 +17,20 @@ class SmilePreviewScreen extends StatefulWidget {
   const SmilePreviewScreen({
     super.key,
     required this.photo,
-    required this.after,
-    required this.afterLabel,
+    this.after,
+    this.afterLabel = '',
     this.pick,
+    this.pickRecords,
     this.make,
     this.matcher,
   });
   final PatientPhoto photo;
-  final Uint8List after; // 입힐 변환 결과
+  final Uint8List? after; // 입힐 변환 결과 (아직 변환 전이면 null → 보철 사진 정밀 매칭만)
   final String afterLabel;
 
   /// 시험용
   final Future<Uint8List?> Function(ImageSource src)? pick;
+  final Future<List<PickedPhoto>?> Function()? pickRecords;
   final Future<Uint8List> Function(
     Uint8List smile,
     Uint8List after,
@@ -104,6 +107,7 @@ class _SmilePreviewScreenState extends State<SmilePreviewScreen> {
         _show = 3;
         p.smileAfter = r.finalImage;
         p.smileFrom = '보철 사진 정밀 매칭';
+        p.noteSmile();
         _pos = 0.5;
         _matchStep =
             '완성! ${r.align.summary}${r.notes.isEmpty ? '' : '\n${r.notes.join('\n')}'}';
@@ -226,16 +230,17 @@ class _SmilePreviewScreenState extends State<SmilePreviewScreen> {
                             : () => _pickProsth(ImageSource.camera),
                         child: const Text('촬영'),
                       ),
-                      OutlinedButton(
-                        onPressed: _matching
-                            ? null
-                            : () => setState(() {
-                                _prosth = widget.after;
-                                _prosthLabel = widget.afterLabel;
-                                _match = null;
-                              }),
-                        child: Text('지금 결과 쓰기 (${widget.afterLabel})'),
-                      ),
+                      if (widget.after != null)
+                        OutlinedButton(
+                          onPressed: _matching
+                              ? null
+                              : () => setState(() {
+                                  _prosth = widget.after;
+                                  _prosthLabel = widget.afterLabel;
+                                  _match = null;
+                                }),
+                          child: Text('지금 결과 쓰기 (${widget.afterLabel})'),
+                        ),
                     ],
                   ),
                 ),
@@ -315,9 +320,20 @@ class _SmilePreviewScreenState extends State<SmilePreviewScreen> {
   }
 
   Future<void> _pick(ImageSource src) async {
-    Uint8List? bytes;
+    var list = <Uint8List>[];
     if (widget.pick != null) {
-      bytes = await widget.pick!(src);
+      final b = await widget.pick!(src);
+      if (b != null) list = [b];
+    } else if (src == ImageSource.gallery) {
+      // 여러 장 고르기 → 모두 비교 목록에 (고른 차례대로), 첫 장으로 미소 미리보기
+      final fs = await ImagePicker().pickMultiImage(
+        maxWidth: 2400,
+        maxHeight: 2400,
+        imageQuality: 92,
+      );
+      for (final f in fs) {
+        list.add(await f.readAsBytes());
+      }
     } else {
       final f = await ImagePicker().pickImage(
         source: src,
@@ -325,9 +341,36 @@ class _SmilePreviewScreenState extends State<SmilePreviewScreen> {
         maxHeight: 2400,
         imageQuality: 92,
       );
-      bytes = await f?.readAsBytes();
+      if (f != null) list = [await f.readAsBytes()];
     }
-    if (bytes == null || !mounted) return;
+    if (list.isEmpty || !mounted) return;
+    for (var i = 1; i < list.length; i++) {
+      final k = p.extras.where((e) => e.sub == '미소 사진').length + 1;
+      p.addExtra(list[i], '😊 미소 $k', sub: '미소 사진');
+    }
+    await _useSmile(list.first);
+    if (list.length > 1 && mounted) {
+      setState(() => _msg = '${list.length}장을 비교 목록에 넣었어요. 첫 장으로 미소 미리보기를 해요.');
+    }
+  }
+
+  /// 🗂 환자 기록에서 사진 여러 장 불러오기 → 비교 목록 (누른 차례대로), 첫 미소 사진으로 미리보기
+  Future<void> _pickFromRecords() async {
+    final got = widget.pickRecords != null
+        ? await widget.pickRecords!()
+        : await pickRecordPhotos(context, smileFirst: true);
+    if (got == null || got.isEmpty || !mounted) return;
+    for (final g in got) {
+      p.addExtra(g.bytes, g.label, sub: g.sub);
+    }
+    final first = got.where((g) => g.smile).firstOrNull ?? got.first;
+    await _useSmile(first.bytes);
+    if (mounted) {
+      setState(() => _msg = '환자 기록에서 ${got.length}장을 비교 목록에 넣었어요.');
+    }
+  }
+
+  Future<void> _useSmile(Uint8List bytes) async {
     await setSmile(p, bytes);
     if (!mounted) return;
     setState(() => _msg = null);
@@ -361,24 +404,23 @@ class _SmilePreviewScreenState extends State<SmilePreviewScreen> {
   }
 
   Future<void> _make() async {
-    final set = p.smileSet, smile = p.smile;
-    if (set == null || smile == null || set.union == null) return;
+    final set = p.smileSet, smile = p.smile, after = widget.after;
+    if (set == null || smile == null || set.union == null || after == null) {
+      return;
+    }
     setState(() {
       _making = true;
       _msg = '😊 미소에 입히는 중… (입 주변만 AI로 바꾸고 입술·얼굴은 그대로 둡니다)';
     });
     try {
       final out = widget.make != null
-          ? await widget.make!(smile, widget.after, set.union!)
-          : await makeSmile(
-              smile: smile,
-              after: widget.after,
-              region: set.union!,
-            );
+          ? await widget.make!(smile, after, set.union!)
+          : await makeSmile(smile: smile, after: after, region: set.union!);
       if (!mounted) return;
       setState(() {
         p.smileAfter = out;
         p.smileFrom = widget.afterLabel;
+        p.noteSmile();
         _pos = 0.5;
         _msg = '완성! 메인 비교 화면의 [😊 미소 비교]로도 볼 수 있어요.';
       });
@@ -437,7 +479,9 @@ class _SmilePreviewScreenState extends State<SmilePreviewScreen> {
       mainAxisSize: MainAxisSize.min,
       children: [
         Text(
-          '입힐 결과: ${widget.afterLabel}',
+          widget.after == null
+              ? '아직 변환 전이에요 · 보철 사진 정밀 매칭은 아래에서 바로 할 수 있어요'
+              : '입힐 결과: ${widget.afterLabel}',
           style: const TextStyle(
             fontWeight: FontWeight.w800,
             color: AppColors.blueDeep,
@@ -456,7 +500,12 @@ class _SmilePreviewScreenState extends State<SmilePreviewScreen> {
             OutlinedButton.icon(
               onPressed: _making ? null : () => _pick(ImageSource.gallery),
               icon: const Icon(Icons.photo_library_outlined),
-              label: Text(has ? '사진 바꾸기' : '갤러리에서 고르기'),
+              label: Text(has ? '사진 바꾸기 (여러 장)' : '갤러리에서 고르기 (여러 장)'),
+            ),
+            OutlinedButton.icon(
+              onPressed: _making ? null : _pickFromRecords,
+              icon: const Icon(Icons.folder_open_outlined),
+              label: const Text('🗂 환자 기록에서'),
             ),
             if (has)
               OutlinedButton.icon(
@@ -469,7 +518,10 @@ class _SmilePreviewScreenState extends State<SmilePreviewScreen> {
         const SizedBox(height: 10),
         FilledButton.icon(
           style: FilledButton.styleFrom(minimumSize: const Size(0, 50)),
-          onPressed: !has || set.union == null || _making ? null : _make,
+          onPressed:
+              !has || set.union == null || _making || widget.after == null
+              ? null
+              : _make,
           icon: _making
               ? const SizedBox(
                   width: 18,
@@ -589,5 +641,6 @@ Future<void> setSmile(PatientPhoto p, Uint8List bytes) async {
   p.smileSet = ToothMaskSet(bytes);
   p.smileAfter = null;
   p.smileFrom = '';
+  p.noteSmile(); // 왼쪽 비교 목록에도 (불러온 차례대로)
   await p.smileSet!.prep();
 }

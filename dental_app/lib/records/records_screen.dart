@@ -527,22 +527,11 @@ class _RecordDetailScreenState extends State<RecordDetailScreen> {
                     icon: const Icon(Icons.input_rounded),
                     label: const Text('🖼 시뮬레이터로 불러오기'),
                   ),
-                  if (r.shots.isNotEmpty)
-                    OutlinedButton.icon(
-                      style: OutlinedButton.styleFrom(
-                        minimumSize: const Size(0, 46),
-                      ),
-                      onPressed: _loading ? null : () => _load(smile: true),
-                      icon: const Icon(Icons.sentiment_very_satisfied_outlined),
-                      label: Text(
-                        r.hasSmile ? '😊 미소 미리보기 다시 하기' : '😊 미소 미리보기',
-                      ),
-                    ),
                 ],
               ),
               const SizedBox(height: 4),
               const Text(
-                '불러오면 원본·변환 결과·상담 내용이 시뮬레이터에 다시 열려, 비교·미소 미리보기·치아 크기 조절을 이어서 할 수 있어요.',
+                '불러오면 원본·변환 결과·상담 내용·미소 사진이 시뮬레이터에 다시 열려요. 😊 미소 미리보기는 시뮬레이터 첫 화면 위쪽 버튼에서 해요.',
                 style: TextStyle(fontSize: 12, color: AppColors.gray500),
               ),
               const SizedBox(height: 12),

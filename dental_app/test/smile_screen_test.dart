@@ -78,7 +78,7 @@ void main() {
         isNull,
       );
       await t.runAsync(() async {
-        await t.tap(find.text('갤러리에서 고르기'));
+        await t.tap(find.text('갤러리에서 고르기 (여러 장)'));
         await Future<void>.delayed(const Duration(milliseconds: 800));
       });
       await t.pump();

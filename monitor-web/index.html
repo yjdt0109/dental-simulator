@@ -9,14 +9,14 @@
 <link rel="icon" href="icons/icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@500;600;700&family=Noto+Sans+KR:wght@400;500;700;800&display=swap">
-<link rel="stylesheet" href="style.css?v=3.26">
+<link rel="stylesheet" href="style.css?v=3.27">
 </head>
 <body>
 <header class="bar">
   <div class="logo" aria-hidden="true">
     <svg width="22" height="22" viewBox="0 0 100 100"><path d="M32 24C18 24 17 42 22 52C27 62 28 80 36 80C43 80 42 62 50 62C58 62 57 80 64 80C72 80 73 62 78 52C83 42 82 24 68 24C60 24 56 29 50 29C44 29 40 24 32 24Z" fill="none" stroke="#fff" stroke-width="6" stroke-linejoin="round"/><line x1="50" y1="14" x2="50" y2="88" stroke="#fff" stroke-width="5" stroke-linecap="round"/></svg>
   </div>
-  <div class="brand"><b>상담 모니터 <span class="ver">v3.26</span></b><small id="sub">B&amp;A 치과 시뮬레이터</small></div>
+  <div class="brand"><b>상담 모니터 <span class="ver">v3.27</span></b><small id="sub">B&amp;A 치과 시뮬레이터</small></div>
   <select id="roomName" aria-label="상담실 이름">
     <option>상담실 1</option><option>상담실 2</option><option>상담실 3</option><option>상담실 4</option><option>원장실</option><option>대기실 TV</option>
   </select>
@@ -126,7 +126,8 @@
             </div>
             <button type="button" class="btn sm" id="smPick" hidden>✔ 이 사진을 미소 비교에 쓰기</button>
             <small id="smHint">사진을 올리면 입술 사이 치아를 자동으로 찾아요</small>
-            <label class="btn sm" for="smFile">📷 미소 사진 올리기</label><input type="file" accept="image/*" id="smFile" hidden>
+            <label class="btn sm" for="smFile">📷 미소 사진 올리기 (여러 장)</label>
+            <button type="button" class="btn sm" id="smFromRec">🗂 환자 기록에서 불러오기</button><input type="file" accept="image/*" id="smFile" multiple hidden>
             <button type="button" class="btn sm" id="smAuto">🪄 입술 사이 자동 찾기</button>
             <small>🪄 사진 속 치아를 클릭하면 추가 / 다시 클릭하면 빠짐</small>
             <div class="rz-acts" style="margin-top:0">
@@ -375,7 +376,7 @@
     <div class="ov-head">
       <h2 id="recDetTitle">기록</h2>
       <button class="btn sm primary" type="button" id="recLoad" title="원본·변환 결과·상담 내용을 시뮬레이터에 다시 열기">🖼 시뮬레이터로 불러오기</button>
-      <button class="btn sm" type="button" id="recSmile" title="불러온 뒤 미소 미리보기 바로 열기">😊 미소 미리보기</button>
+      <button class="btn sm" type="button" id="recSmile" title="이 기록의 미소 사진을 지금 환자의 비교 목록과 미소 미리보기로 가져오기">😊 이 미소 사진 불러오기</button>
       <button class="btn sm danger" type="button" id="recDel">삭제</button>
       <button class="btn icon" type="button" data-close="recDetOv" aria-label="닫기">✕</button>
     </div>
@@ -392,6 +393,6 @@
 </div>
 
 <script src="qrcode.min.js"></script>
-<script type="module" src="app.js?v=3.26"></script>
+<script type="module" src="app.js?v=3.27"></script>
 </body>
 </html>

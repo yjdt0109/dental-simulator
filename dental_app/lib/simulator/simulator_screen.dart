@@ -34,6 +34,7 @@ import 'tooth_resize.dart';
 import 'resize_session.dart';
 import 'sim_import.dart';
 import 'smile_screen.dart';
+import '../records/record_photo_picker.dart';
 import '../ai/smile.dart' show makeSmile;
 import '../ai/smile_match.dart';
 import '../privacy/mouth_finder.dart';
@@ -155,8 +156,9 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
     final c = _c;
     // 처음부터 PC에 Before 사진 표시, After 를 만들면 Before/After
     // (브리핑 끔: 위아래 보기, 브리핑 켬: 슬라이더)
-    final converted = p.afterBytes != null && !p.editing;
+    final converted = _mode != _ViewMode.edit;
     final cmp = p.compare;
+    final order = p.listOrder;
     final smileOn = _smileView && converted && p.smileAfter != null;
     final left = smileOn
         ? p.smile!
@@ -170,12 +172,12 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
         : null;
     cs.sendImages(
       '${p.id}|${identityHashCode(p.beforeBytes)}|${identityHashCode(left)}|'
-      '${identityHashCode(right)}|${identityHashCode(p.results)}',
+      '${identityHashCode(right)}|${identityHashCode(p.results)}|${p.extras.length}',
       left,
       right,
-      thumbs: p.results.isEmpty
+      thumbs: order.length < 2
           ? const []
-          : [p.beforeBytes, for (final r in p.results) r.bytes],
+          : [for (final n in order) p.bytesOf(n)],
     );
     final aiReady = AiService.instance.ready;
     cs.sendState({
@@ -202,8 +204,9 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
       'aiPrompt': _useAi ? _aiPrompt() : '',
       'undo': p.history.isEmpty ? null : p.history.last.label,
       'redo': p.future.isEmpty ? null : p.future.last.label,
-      'items': [for (var n = 0; n <= p.results.length; n++) _label(p, n)],
-      'cmp': cmp,
+      'items': [for (final n in order) _label(p, n)],
+      'subs': [for (final n in order) _sub(p, n)],
+      'cmp': [for (final n in cmp) order.indexOf(n)],
       'drawLines': _drawLines,
       'samOn': _samOn && c.doneAt == null,
       'sam': p.sam.length,
@@ -673,6 +676,10 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
 
   _ViewMode get _mode {
     final p = _cur!;
+    // 브리핑: 변환 결과나 불러온 사진(미소 등)이 있으면 왼쪽 목록에서 골라 비교
+    if (_briefing && (p.results.isNotEmpty || p.extras.isNotEmpty)) {
+      return _ViewMode.slider;
+    }
     if (p.editing || p.afterBytes == null) return _ViewMode.edit;
     return _briefing ? _ViewMode.slider : _ViewMode.stack;
   }
@@ -824,6 +831,7 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
       await setSmile(p, k.smile!);
       p.smileAfter = k.smileAfter;
       p.smileFrom = k.smileFrom;
+      p.noteSmile();
     }
     if (!mounted) return '시뮬레이터 화면이 닫혀 있습니다.';
     _patients.insert(0, p);
@@ -948,7 +956,13 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
         if (label != null) _toast('↷ PC에서 \'$label\' 상태로 다시 돌렸습니다.');
         return;
       case 'cmpToggle':
-        if (v is int) setState(() => p.toggleSel(v));
+        // PC 는 목록 위치(0, 1, 2 …)로 보냄 → 사진 번호로
+        if (v is int && v >= 0 && v < p.listOrder.length) {
+          setState(() {
+            _smileView = false;
+            p.toggleSel(p.listOrder[v]);
+          });
+        }
         return;
       case 'before':
         if (p.afterBytes != null && !p.editing) {
@@ -1096,6 +1110,8 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
         _smileRemoteMake(p);
       case 'smileView':
         setState(() => _smileView = v == true && p.smileAfter != null);
+      case 'smileFromRec': // PC 환자 기록 → 미소 사진(+미소 미리보기)을 비교 목록에, 미소 사진은 미리보기용으로
+        if (v is String) _smileFromRecord(p, v);
       case 'matchPhoto': // PC 🦷 보철 사진(2번) 올리기
         if (v is String && v.length < 12000000) {
           _matchSet(p, base64Decode(v), '보철 사진 (PC에서 올림)');
@@ -1944,18 +1960,19 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
       _ViewMode.slider when p.compare.length == 1 => _SinglePhoto(
         bytes: p.bytesOf(p.compare.first),
         title: _label(p, p.compare.first),
-        sub: p.compare.first == 0 ? '치료 전' : '시뮬레이션',
+        sub: _sub(p, p.compare.first),
         fit: _fit,
-        overlay: p.compare.first == 0 ? null : _contourFor(p),
+        overlay: _overlayFor(p, p.compare.first),
       ),
       _ViewMode.stack => StackedCompare(
         before: p.bytesOf(p.compare[0]),
         after: p.bytesOf(p.compare[1]),
         fit: _fit,
         beforeTitle: _label(p, p.compare[0]),
-        beforeSub: p.compare[0] == 0 ? '치료 전' : '시뮬레이션',
+        beforeSub: _sub(p, p.compare[0]),
         afterTitle: _label(p, p.compare[1]),
-        afterOverlay: _contourFor(p),
+        afterSub: _sub(p, p.compare[1]),
+        afterOverlay: _overlayFor(p, p.compare[1]),
       ),
       _ViewMode.slider => SliderCompare(
         before: p.bytesOf(p.compare[0]),
@@ -1964,9 +1981,10 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
         position: _pos,
         onChanged: (v) => setState(() => _pos = v),
         beforeTitle: _label(p, p.compare[0]),
-        beforeSub: p.compare[0] == 0 ? '치료 전' : '시뮬레이션',
+        beforeSub: _sub(p, p.compare[0]),
         afterTitle: _label(p, p.compare[1]),
-        afterOverlay: _contourFor(p),
+        afterSub: _sub(p, p.compare[1]),
+        afterOverlay: _overlayFor(p, p.compare[1]),
       ),
     };
     // 😊 미소 비교: 원본 미소 ↔ 시뮬레이션 미소
@@ -2147,15 +2165,6 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
             ),
           if (canResize)
             OutlinedButton.icon(
-              onPressed: () => _openSmile(p),
-              icon: const Icon(
-                Icons.sentiment_very_satisfied_outlined,
-                size: 18,
-              ),
-              label: Text(hasSmile ? '😊 미소 미리보기 다시' : '😊 미소 미리보기'),
-            ),
-          if (canResize)
-            OutlinedButton.icon(
               onPressed: () => _openResize(p),
               icon: const Icon(Icons.open_in_full_rounded, size: 18),
               label: const Text('🦷 치아 크기 조절'),
@@ -2301,6 +2310,92 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
     }
   }
 
+  Future<void> _smileFromRecord(PatientPhoto p, String id) async {
+    await PatientRecords.instance.ensureLoaded();
+    final r = PatientRecords.instance.records
+        .where((x) => x.id == id)
+        .firstOrNull;
+    final f = r == null ? null : await readRecordFiles(r);
+    if (r == null || f == null || f.smile == null) {
+      _smileMsg = '그 기록에는 미소 사진이 없어요';
+      _smilePublish(p);
+      return;
+    }
+    final who = r.name.isEmpty ? '기록' : r.name;
+    final sub = '환자 기록 · ${r.dayText} ${r.time}';
+    p.addExtra(f.smile!, '😊 $who 미소', sub: sub);
+    if (f.smileAfter != null) {
+      p.addExtra(f.smileAfter!, '😊 $who 미소 미리보기', sub: sub);
+    }
+    await setSmile(p, f.smile!);
+    _smileMsg = '환자 기록($who ${r.dayText})의 미소 사진을 불러왔어요 · 왼쪽 비교 목록에도 들어갔어요';
+    _smilePublish(p);
+    await _smileRemoteAuto(p);
+  }
+
+  /// 비교 목록 [사진 추가]: 갤러리(여러 장) 또는 환자 기록에서 → 불러온 차례대로 목록 끝에
+  Future<void> _addCompare(PatientPhoto p) async {
+    final src = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      backgroundColor: Colors.white,
+      constraints: const BoxConstraints(maxWidth: 480),
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(
+                Icons.folder_open_outlined,
+                color: AppColors.blue,
+              ),
+              title: const Text('🗂 환자 기록에서 (여러 장)'),
+              onTap: () => Navigator.pop(ctx, 'rec'),
+            ),
+            ListTile(
+              leading: const Icon(
+                Icons.photo_library_outlined,
+                color: AppColors.blue,
+              ),
+              title: const Text('갤러리에서 (여러 장)'),
+              onTap: () => Navigator.pop(ctx, 'gal'),
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+    if (src == null || !mounted) return;
+    var added = 0;
+    if (src == 'rec') {
+      final got = await pickRecordPhotos(context);
+      if (got == null) return;
+      for (final g in got) {
+        p.addExtra(g.bytes, g.label, sub: g.sub);
+        added++;
+      }
+    } else {
+      try {
+        final fs = await _picker.pickMultiImage(
+          maxWidth: 2000,
+          maxHeight: 2000,
+          imageQuality: 92,
+        );
+        for (final f in fs) {
+          final k = p.extras.where((e) => e.sub == '불러온 사진').length + 1;
+          p.addExtra(await f.readAsBytes(), '사진 $k', sub: '불러온 사진');
+          added++;
+        }
+      } catch (e) {
+        _toast('사진을 불러오지 못했습니다. 사진 권한을 확인해 주세요.');
+        return;
+      }
+    }
+    if (!mounted || added == 0) return;
+    setState(() {});
+    _toast('비교 목록에 $added장을 넣었습니다 · 눌러서 비교해 보세요');
+  }
+
   Future<void> _smileRemoteAuto(PatientPhoto p) async {
     final set = p.smileSet;
     if (set == null) return;
@@ -2350,6 +2445,7 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
       setState(() {
         p.smileAfter = out;
         p.smileFrom = _label(p, n);
+        p.noteSmile();
         _smileView = true;
         _smileMsg = '완성! 미소 비교로 보여 드립니다';
       });
@@ -2429,6 +2525,7 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
         _mPick = 3;
         p.smileAfter = r.finalImage;
         p.smileFrom = '보철 사진 정밀 매칭';
+        p.noteSmile();
         _smileView = identical(p, _cur);
         _mStep =
             '완성! ${r.align.summary}${r.notes.isEmpty ? '' : '\n${r.notes.join('\n')}'}';
@@ -2453,26 +2550,28 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
       _mPick = n;
       p.smileAfter = [r.composite, r.stage1, r.finalImage][n - 1];
       p.smileFrom = '보철 사진 정밀 매칭 (${['① 정렬 합성', '② FLUX 1차', '③ 최종'][n - 1]})';
+      p.noteSmile();
       _smileView = true;
     });
     _smilePublish(p);
     _smileSave(p);
   }
 
+  /// 😊 미소 미리보기 (변환 전에도 열림: 미소 사진·보철 사진 정밀 매칭)
   Future<void> _openSmile(PatientPhoto p) async {
     final after = _shownAfter(p);
-    if (after == null) return;
     final n = p.compare.where((i) => i > 0).lastOrNull ?? p.results.length;
     await Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => SmilePreviewScreen(
           photo: p,
           after: after,
-          afterLabel: _label(p, n),
+          afterLabel: after == null ? '' : _label(p, n),
         ),
       ),
     );
     if (!mounted) return;
+    p.noteSmile();
     setState(() => _smileView = p.smileAfter != null);
     _smilePublish(p); // 태블릿에서 만든 미소도 PC 로
     _smileSave(p);
@@ -2640,6 +2739,7 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
 
   /// 원본 / 김민수 1번 / 김민수 2번 …
   String _label(PatientPhoto p, int n) {
+    if (n < 0) return -n <= p.extras.length ? p.extras[-n - 1].label : '사진';
     if (n == 0) return '원본';
     final name = p.consult.name.trim();
     final r = n <= p.results.length ? p.results[n - 1] : null;
@@ -2651,6 +2751,17 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
         : ' 🦷⚠';
     return '${name.isEmpty ? '시뮬레이션' : name} $n번${e.isEmpty ? '' : ' ($e)'}$ck';
   }
+
+  /// 사진 아래 작은 글씨 (치료 전 / 시뮬레이션 / 불러온 사진 설명)
+  String _sub(PatientPhoto p, int n) => n == 0
+      ? '치료 전'
+      : n > 0
+      ? '시뮬레이션'
+      : (-n <= p.extras.length ? p.extras[-n - 1].sub : '');
+
+  /// 원본 윤곽 점선은 변환 결과에만
+  Uint8List? _overlayFor(PatientPhoto p, int n) =>
+      n > 0 ? _contourFor(p) : null;
 
   Widget _comparePicker(PatientPhoto p) {
     final cmp = p.compare;
@@ -2669,7 +2780,10 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
           ),
           clipBehavior: Clip.antiAlias,
           child: InkWell(
-            onTap: () => setState(() => p.toggleSel(n)),
+            onTap: () => setState(() {
+              _smileView = false; // 고른 사진을 보여 줌
+              p.toggleSel(n);
+            }),
             child: Padding(
               padding: const EdgeInsets.all(5),
               child: Column(
@@ -2684,6 +2798,8 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
                         fit: BoxFit.cover,
                         gaplessPlayback: true,
                         cacheWidth: 240,
+                        errorBuilder: (_, _, _) =>
+                            const ColoredBox(color: AppColors.gray200),
                       ),
                     ),
                   ),
@@ -2737,7 +2853,21 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
           ),
           Expanded(
             child: ListView(
-              children: [for (var n = 0; n <= p.results.length; n++) item(n)],
+              children: [
+                for (final n in p.listOrder) item(n),
+                OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 6),
+                    minimumSize: const Size(0, 40),
+                  ),
+                  onPressed: () => _addCompare(p),
+                  icon: const Icon(
+                    Icons.add_photo_alternate_outlined,
+                    size: 18,
+                  ),
+                  label: const Text('사진 추가', style: TextStyle(fontSize: 12)),
+                ),
+              ],
             ),
           ),
         ],
@@ -2819,6 +2949,20 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
               phone,
               _choosePhoto,
             ),
+            // 변환하기 전에도: 예전에 변환했던 기록 불러오기 · 미소 미리보기
+            _headButton(
+              Icons.history_rounded,
+              '이전 변환 불러오기',
+              phone,
+              _openRecords,
+            ),
+            if (!_briefing)
+              _headButton(
+                Icons.sentiment_very_satisfied_outlined,
+                p.smile == null ? '😊 미소 미리보기' : '😊 미소 미리보기 다시',
+                phone,
+                () => _openSmile(p),
+              ),
             if (mode != _ViewMode.edit)
               _headButton(
                 Icons.crop_free_rounded,

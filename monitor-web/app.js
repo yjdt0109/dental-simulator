@@ -107,6 +107,7 @@ function render() {
   const tabletView = state.view || 'edit';
   if (tabletView !== lastTabletView) { lastTabletView = tabletView; localView = null; }
   const items = Array.isArray(state.items) ? state.items.map(String) : ['원본'];
+  const subs = Array.isArray(state.subs) ? state.subs.map(String) : []; // 태블릿 2026.11.19-e 이상: 불러온 사진 설명
   const cmp = Array.isArray(state.cmp) ? state.cmp.filter((n) => Number.isInteger(n) && n < items.length) : [0];
   const hasAfterShown = tabletView !== 'edit' && images && images.after;
   // one: 비교 목록에서 1장만 고름 → 그 사진만 크게
@@ -116,7 +117,7 @@ function render() {
       : !hasAfterShown ? 'edit' : (localView || tabletView);
   if (imgBehind && curView) view = curView; // 맞는 사진이 도착하기 전에는 보기 방식을 바꾸지 않음
   const smileV = !!(state.smile && state.smile.view);
-  const lbl = (id, n) => { const el = $(id); if (!el) return; if (smileV) { el.querySelector('b').textContent = n ? '미소 미리보기' : '미소'; el.querySelector('span').textContent = n ? '시뮬레이션' : '치료 전'; el.classList.toggle('after', !!n); return; } el.querySelector('b').textContent = items[n] || '원본'; el.querySelector('span').textContent = n ? '시뮬레이션' : '치료 전'; el.classList.toggle('after', !!n); };
+  const lbl = (id, n) => { const el = $(id); if (!el) return; if (smileV) { el.querySelector('b').textContent = n ? '미소 미리보기' : '미소'; el.querySelector('span').textContent = n ? '시뮬레이션' : '치료 전'; el.classList.toggle('after', !!n); return; } el.querySelector('b').textContent = items[n] || '원본'; el.querySelector('span').textContent = subs[n] != null ? subs[n] : n ? '시뮬레이션' : '치료 전'; el.classList.toggle('after', !!n); };
   if (view === 'one') lbl('#lblSingle', cmp[0]); else { const e = $('#lblSingle'); e.querySelector('b').textContent = '원본'; e.querySelector('span').textContent = '치료 전'; e.classList.remove('after'); }
   if (cmp.length === 2) { lbl('#lblL', cmp[0]); lbl('#lblR', cmp[1]); lbl('#lblSB', cmp[0]); lbl('#lblSA', cmp[1]); }
   $('#lblR').classList.remove('after'); $('#lblL').classList.toggle('after', !!cmp[0] && cmp.length === 2);
@@ -901,7 +902,7 @@ function renderQa() {
   const running = !!q.running;
   const newApp = !!qa;
   const warn = !qaConnected() ? '태블릿이 연결되어 있지 않습니다. QR 로 연결해 주세요.'
-    : !newApp ? '태블릿 앱을 최신 버전(2026.11.19-d 이상)으로 업데이트해야 자동 QA 를 PC 에서 쓸 수 있습니다.'
+    : !newApp ? '태블릿 앱을 최신 버전(2026.11.19-e 이상)으로 업데이트해야 자동 QA 를 PC 에서 쓸 수 있습니다.'
     : !(images && images.before) ? '태블릿에서 환자 사진을 먼저 올려 주세요 (PC 의 [사진 올리기] 도 가능).'
     : q.ready === false ? '태블릿의 AI 연결이 준비되지 않았습니다 (태블릿 [API 키 설정] 확인).' : '';
   $('#qaWarn').hidden = !warn; $('#qaWarn').textContent = warn;
@@ -1025,7 +1026,7 @@ function renderArchive() {
   const a = archive;
   if (!qaConnected() || !a) {
     setHtml($('#archFolders'), '');
-    setHtml($('#archGrid'), `<p class="empty">${!qaConnected() ? '태블릿을 연결하면 태블릿에 저장된 보관함이 보입니다.' : '보관함이 비어 있거나, 태블릿 앱 업데이트(2026.11.19-d 이상)가 필요합니다.'}</p>`);
+    setHtml($('#archGrid'), `<p class="empty">${!qaConnected() ? '태블릿을 연결하면 태블릿에 저장된 보관함이 보입니다.' : '보관함이 비어 있거나, 태블릿 앱 업데이트(2026.11.19-e 이상)가 필요합니다.'}</p>`);
     return;
   }
   const folders = a.folders || [];
@@ -1142,7 +1143,7 @@ function renderRecords() {
   if ($('#recOv').hidden) return;
   if (!qaConnected() || !records) {
     setHtml($('#recTx'), ''); $('#recCount').textContent = '';
-    setHtml($('#recTree'), `<p class="empty">${!qaConnected() ? '태블릿을 연결하면 태블릿에 저장된 환자 기록이 보입니다.' : '아직 저장된 기록이 없거나, 태블릿 앱 업데이트(2026.11.19-d 이상)가 필요합니다.'}</p>`);
+    setHtml($('#recTree'), `<p class="empty">${!qaConnected() ? '태블릿을 연결하면 태블릿에 저장된 환자 기록이 보입니다.' : '아직 저장된 기록이 없거나, 태블릿 앱 업데이트(2026.11.19-e 이상)가 필요합니다.'}</p>`);
     return;
   }
   setHtml($('#recTx'), TX_ALL.map((t) => `<button type="button" data-tx="${esc(t)}" class="${recTx === t ? 'on' : ''}" aria-pressed="${recTx === t}">${esc(t)}</button>`).join(''));
@@ -1176,8 +1177,7 @@ function openRecord(id) {
   if (!r) return;
   recOpen = r;
   $('#recDetTitle').textContent = `${r.name} 님 · ${r.dayText} ${r.time}`;
-  $('#recSmile').hidden = !(r.shots || []).length;
-  $('#recSmile').textContent = r.hasSmile ? '😊 미소 미리보기 다시' : '😊 미소 미리보기';
+  $('#recSmile').hidden = !r.hasSmile;
   const th = r.thumbs || {};
   const info = [['상담 날짜', `${r.dayText} ${r.time}`], ['환자', `${r.name} 님`], ['사진', r.photoType || '-'],
     ['치료 항목', (r.treatments || []).join(', ') || '선택 안 함'], ['치료 부위', (r.teeth || []).map((t) => '#' + t).join(' ') || '-'],
@@ -1206,6 +1206,8 @@ function gotRecordFull(v) {
   remove(ref(db, 'rooms/' + room + '/recordFull')).catch(() => {});
 }
 $('#recBtn').addEventListener('click', () => { openOv('recOv'); renderRecords(); });
+// 😊 미소 창에서 [🗂 환자 기록에서 불러오기] → 기록 목록 열기 (기록을 열어 [😊 이 미소 사진 불러오기])
+$('#smFromRec').addEventListener('click', () => { openOv('recOv'); renderRecords(); $('#smMsg').textContent = '기록을 열고 [😊 이 미소 사진 불러오기]를 눌러 주세요'; });
 $('#recQ').addEventListener('input', renderRecords);
 $('#recDay').addEventListener('change', renderRecords);
 $('#recReset').addEventListener('click', () => { $('#recQ').value = ''; $('#recDay').value = ''; recTx = null; renderRecords(); });
@@ -1226,11 +1228,13 @@ $('#recLoad').addEventListener('click', () => {
   cmd('recLoad', recOpen.id);
   closeOv('recDetOv'); closeOv('recOv');
 });
+// 😊 이 기록의 미소 사진만 지금 환자의 비교 목록 + 미소 미리보기로 (여러 번 누르면 차례대로 쌓임)
 $('#recSmile').addEventListener('click', () => {
   if (!recOpen) return;
-  cmd('recLoad', recOpen.id);
-  smOpen = true; // 태블릿이 불러오면 미소 미리보기 창이 열림
+  cmd('smileFromRec', recOpen.id);
+  smOpen = true; smTab = 'area';
   closeOv('recDetOv'); closeOv('recOv');
+  render();
 });
 $('#recDel').addEventListener('click', () => {
   if (!recOpen) return;
@@ -1394,7 +1398,7 @@ function renderSmile(view) {
     smMWaiting = false; smMSawBusy = false;
     if (mm.made) { smOpen = false; smTab = 'm3'; showSmileImg(); }
   }
-  const can = !!sm && state.useAi && view !== 'edit' && !locked() && !(state && state.rz);
+  const can = !!sm && state.useAi && !locked() && !(state && state.rz); // 변환 전 첫 화면에서도
   $('#smOpenBar').hidden = !can || smOpen;
   $('#smView').hidden = !(sm && sm.made);
   $('#smView').setAttribute('aria-pressed', String(!!(sm && sm.view)));
@@ -1409,7 +1413,7 @@ function renderSmile(view) {
   $('#smMake').textContent = sm.busy ? '⏳ 처리 중…' : sm.made ? '😊 다시 입히기' : '😊 미소에 입히기';
   $('#smHint').textContent = !sm.has ? '사진을 올리면 입술 사이 치아를 자동으로 찾아요' : sm.n > 0 ? `치아 영역 ${sm.n}개 선택됨` : '🪄 미소 사진 속 치아를 클릭해 고르세요';
   $('#smMsg').textContent = sm.msg || '';
-  // 🦷 보철 사진 정밀 매칭 (태블릿 앱 2026.11.19-d 이상)
+  // 🦷 보철 사진 정밀 매칭 (태블릿 앱 2026.11.19-e 이상)
   $('#smMatch').hidden = !mm;
   if (mm) {
     const busy = !!mm.busy;
@@ -1449,9 +1453,12 @@ $('#smCanvas').addEventListener('click', (e) => {
 });
 // 사진 파일 → 긴 변 2400 JPEG base64 → 태블릿으로
 async function sendPhoto(e, cmdName, msgEl, what) {
-  const f = e.target.files && e.target.files[0];
+  const fs = [...(e.target.files || [])];
   e.target.value = '';
-  if (!f) return;
+  // 여러 장: 고른 차례대로 하나씩 (태블릿 비교 목록에 차례대로 쌓임)
+  for (const f of (cmdName === 'smilePhoto' ? fs : fs.slice(0, 1))) await sendOne(f, cmdName, msgEl, what);
+}
+async function sendOne(f, cmdName, msgEl, what) {
   try {
     $(msgEl).textContent = what + '을 태블릿으로 보내는 중…';
     const bmp = await createImageBitmap(f, { imageOrientation: 'from-image' });

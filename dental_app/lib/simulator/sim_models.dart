@@ -221,25 +221,68 @@ class PatientPhoto {
   Uint8List? get afterBytes => results.isEmpty ? null : results.last.bytes;
   String? get convKey => results.isEmpty ? null : results.last.convKey;
 
-  /// 브리핑 비교에 고른 사진 (0 = 원본, 1 = 1번 …), 고른 순서대로 최대 2개
+  /// 비교 목록에 더 불러온 사진 (미소 사진·미소 미리보기·환자 기록 사진 …), 불러온 차례대로.
+  /// 번호는 -1, -2, … (원본·변환 결과 다음에 목록에 보임)
+  final List<ExtraPhoto> extras = [];
+
+  /// 같은 사진이 이미 있으면 그 번호, 아니면 새로 넣고 그 번호 (-1, -2 …)
+  int addExtra(Uint8List bytes, String label, {String sub = ''}) {
+    for (var i = 0; i < extras.length; i++) {
+      if (identical(extras[i].bytes, bytes)) return -(i + 1);
+    }
+    extras.add(ExtraPhoto(bytes, label, sub: sub));
+    return -extras.length;
+  }
+
+  /// 지금 미소 사진·미소 미리보기를 비교 목록에 (이미 있으면 그대로)
+  void noteSmile() {
+    bool has(Uint8List b) => extras.any((e) => identical(e.bytes, b));
+    final sm = smile, sa = smileAfter;
+    if (sm != null && !has(sm)) {
+      final k = extras.where((e) => e.sub == '미소 사진').length + 1;
+      addExtra(sm, '😊 미소 $k', sub: '미소 사진');
+    }
+    if (sa != null && !has(sa)) {
+      final k = extras.where((e) => e.sub.startsWith('미소 미리보기')).length + 1;
+      addExtra(
+        sa,
+        '😊 미소 미리보기 $k',
+        sub: '미소 미리보기${smileFrom.isEmpty ? '' : ' · $smileFrom'}',
+      );
+    }
+  }
+
+  /// 비교 목록 순서: 원본(0) → 변환 결과(1…) → 불러온 사진(-1, -2 …)
+  List<int> get listOrder => [
+    for (var n = 0; n <= results.length; n++) n,
+    for (var i = 1; i <= extras.length; i++) -i,
+  ];
+
+  bool _valid(int n) => n >= 0 ? n <= results.length : -n <= extras.length;
+  int _rank(int n) => n >= 0 ? n : results.length - n;
+
+  /// 브리핑 비교에 고른 사진 (0 = 원본, 1 = 1번 …, -1 = 불러온 첫 사진), 고른 순서대로 최대 2개
   List<int> sel = [];
 
-  /// 비교할 두 장 (작은 번호가 왼쪽) — 1장만 골랐으면 [그 번호]
+  /// 비교할 두 장 (목록 위쪽이 왼쪽) — 1장만 골랐으면 [그 번호]
   List<int> get compare {
     final ok = [
       for (final n in sel)
-        if (n >= 0 && n <= results.length) n,
-    ]..sort();
+        if (_valid(n)) n,
+    ]..sort((a, b) => _rank(a).compareTo(_rank(b)));
     if (ok.isNotEmpty) return ok;
     return results.isEmpty ? [0] : [0, results.length];
   }
 
-  Uint8List bytesOf(int n) =>
-      n == 0 || n > results.length ? beforeBytes : results[n - 1].bytes;
+  Uint8List bytesOf(int n) => n < 0 && -n <= extras.length
+      ? extras[-n - 1].bytes
+      : n <= 0 || n > results.length
+      ? beforeBytes
+      : results[n - 1].bytes;
 
   /// 비교 목록에서 사진 체크/해제 (최대 2장, 3번째를 고르면 가장 먼저 고른 것이 빠짐)
   void toggleSel(int n) {
-    if (n < 0 || n > results.length) return;
+    if (!_valid(n)) return;
     final cur = [for (final x in compare) x];
     if (cur.contains(n)) {
       if (cur.length > 1) cur.remove(n); // 마지막 1장은 남김
@@ -321,6 +364,14 @@ class PatientPhoto {
     sel = [];
     editing = true;
   }
+}
+
+/// 비교 목록에 더 불러온 사진 한 장
+class ExtraPhoto {
+  const ExtraPhoto(this.bytes, this.label, {this.sub = ''});
+  final Uint8List bytes;
+  final String label; // 예: 😊 미소 1
+  final String sub; // 예: 치료 전 / 미소 미리보기 / 환자 기록
 }
 
 class AfterResult {
