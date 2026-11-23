@@ -185,9 +185,7 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
       '${identityHashCode(right)}|${identityHashCode(p.results)}|${p.extras.length}',
       left,
       right,
-      thumbs: order.length < 2
-          ? const []
-          : [for (final n in order) p.bytesOf(n)],
+      thumbs: [for (final n in order) p.bytesOf(n)],
     );
     final aiReady = AiService.instance.ready;
     cs.sendState({
@@ -699,8 +697,12 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
     final p = _cur!;
     // 브리핑: 항상 왼쪽 '비교할 사진' 목록에서 골라 비교 (기록 사진도 여기서 추가)
     if (_briefing) return _ViewMode.slider;
-    if (p.editing || p.afterBytes == null) return _ViewMode.edit;
-    return _briefing ? _ViewMode.slider : _ViewMode.stack;
+    if (p.editing) return _ViewMode.edit;
+    // 변환 전이라도 목록에서 불러온 사진을 고르면 그 사진을 보여 줌
+    if (p.afterBytes == null && p.compare.every((n) => n == 0)) {
+      return _ViewMode.edit;
+    }
+    return _ViewMode.stack;
   }
 
   // ---------------------------------------------------------------------------
@@ -1080,6 +1082,7 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
         if (v is int && v >= 0 && v < p.listOrder.length) {
           setState(() {
             _smileView = false;
+            p.editing = false;
             p.toggleSel(p.listOrder[v]);
             p.noteBase(p.listOrder[v]);
           });
@@ -2185,7 +2188,8 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
             );
     }
     // 브리핑 모드: 왼쪽에 원본 + 변환 결과 목록 (체크해서 비교할 사진 고르기)
-    if (_briefing && mode != _ViewMode.edit) {
+    // 왼쪽 '비교할 사진' 목록: 브리핑이 아닐 때도 (불러온 사진 확인·고르기) — 폰처럼 좁으면 브리핑에서만
+    if (_briefing || MediaQuery.sizeOf(context).width >= 700) {
       stage = Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -2953,6 +2957,7 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
           child: InkWell(
             onTap: () => setState(() {
               _smileView = false; // 고른 사진을 보여 줌
+              p.editing = false; // 첫 화면(영역 지정)에서도 고른 사진으로
               p.toggleSel(n);
               p.noteBase(n); // 결과를 누르면 [다시 변환하기] 기준도 그 결과로
             }),

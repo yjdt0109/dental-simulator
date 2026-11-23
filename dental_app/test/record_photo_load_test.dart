@@ -212,4 +212,43 @@ void main() {
     expect(y('한지수 1번 (B)'), greaterThan(y('원본')));
     expect(t.takeException(), isNull);
   });
+
+  testWidgets('브리핑이 아닐 때도(변환 전 첫 화면) 왼쪽 목록에 불러온 사진이 보이고, 누르면 그 사진', (t) async {
+    t.view.physicalSize = const Size(1440, 900);
+    t.view.devicePixelRatio = 1;
+    addTearDown(t.view.reset);
+    await t.pumpWidget(
+      MaterialApp(
+        theme: buildTheme(),
+        home: const SimulatorHomeScreen(profile: _profile),
+      ),
+    );
+    await _settle(t, until: () => find.byType(RoiEditor).evaluate().isNotEmpty);
+    await t.runAsync(() async {
+      CastService.instance.onRemoteCmd?.call({
+        't': 'photo',
+        'v': base64Encode(jpg(60)),
+      });
+      await Future<void>.delayed(const Duration(milliseconds: 600));
+      CastService.instance.onRemoteCmd?.call({
+        't': 'extraPhoto',
+        'v': base64Encode(jpg(180)),
+      });
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+    });
+    await _settle(t);
+    expect(find.textContaining('비교할 사진'), findsOneWidget); // 브리핑 아님
+    expect(find.text('사진 1'), findsOneWidget);
+    expect(find.byType(RoiEditor), findsOneWidget); // 아직 첫 화면
+    await t.tap(find.text('사진 1'));
+    await _settle(t);
+    expect(find.byType(RoiEditor), findsNothing); // 고른 사진 비교로
+    expect(find.textContaining('불러온 사진'), findsWidgets);
+    await t.tap(
+      find.byIcon(Icons.crop_free_rounded),
+    ); // 처음 사진 보기 (AI 끔: 영역 다시 지정)
+    await _settle(t);
+    expect(find.byType(RoiEditor), findsOneWidget);
+    expect(t.takeException(), isNull);
+  });
 }
