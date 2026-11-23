@@ -590,6 +590,9 @@ class TwoPassPipeline {
     required void Function(int step) onStep,
     required void Function(String msg) onNotice,
     img.Image? maskOverride, // 🪄 SAM 으로 고른 치아 마스크 (흰색 = 변환). 있으면 서비컬 라인 대신 사용
+    List<({String label, Uint8List jpeg})> refs =
+        const [], // 2단계 나노바나나에 함께 보낼 참고 사진
+    String refPrompt = '', // 참고 사진 설명 (마무리 지시 뒤에 붙임)
   }) async {
     final s = PipelineSettings.instance;
     if (!s.hasFal) {
@@ -629,13 +632,19 @@ class TwoPassPipeline {
       finished = switch (engine) {
         Engine.a => await AiService.instance.geminiImage(
           model: s.nanoModel,
-          prompt: kFinishPrompt,
+          prompt: refPrompt.isEmpty
+              ? kFinishPrompt
+              : '$kFinishPrompt\n$refPrompt',
           jpeg: p1Jpeg,
+          extra: refs,
         ),
         Engine.b => await AiService.instance.geminiImage(
           model: s.nanoProModel,
-          prompt: kFinishPrompt,
+          prompt: refPrompt.isEmpty
+              ? kFinishPrompt
+              : '$kFinishPrompt\n$refPrompt',
           jpeg: p1Jpeg,
+          extra: refs,
         ),
         Engine.c => await _vertex(
           s,

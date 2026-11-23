@@ -368,3 +368,23 @@ Future<MatchResult> matchProsthesis({
     notes: notes,
   );
 }
+
+/// 😊 원본 2장 방식: 개구기 사진을 변환할 때 같은 환자의 미소 사진을 참고로 보냄
+///   (FLUX 1단계는 사진 1장만 받으므로 나노바나나 단계·단독 변환에서 씀)
+const kSmileRefLabel =
+    'Reference image (DO NOT edit or output it): the SAME patient\'s natural relaxed smile, without the retractor.';
+const kSmileRefPrompt =
+    'A reference photo of the same patient\'s natural smile is attached after the main image. Do not edit or return it. '
+    'Use it only to design the new teeth in the retractor photo (Image 1) so they will look natural in this patient\'s smile: '
+    'the incisal edges of the upper front teeth follow the curve of the lower lip in the smile (smile arc), '
+    'the dental midline matches the facial midline (center of the nose and philtrum), '
+    'tooth length and width proportions suit this face, and the tooth display looks natural with relaxed lips. '
+    'Keep the retractor photo framing, lips, gums outside the treated teeth, and lighting. Output only the edited Image 1.';
+
+/// 미소 사진을 참고용 JPEG 으로 (긴 변 1024)
+Future<List<({String label, Uint8List jpeg})>> smileRefs(
+  Uint8List smile,
+) async {
+  final im = await AiService.decodePhoto(smile, maxSide: 1024);
+  return [(label: kSmileRefLabel, jpeg: await AiService.photoJpeg(im))];
+}

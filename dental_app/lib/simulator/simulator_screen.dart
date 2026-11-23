@@ -216,6 +216,12 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
       'redo': p.future.isEmpty ? null : p.future.last.label,
       'notice': _noticeAt == 0 ? null : {'m': _notice, 'at': _noticeAt},
       'base': p.baseIndex == 0 ? '' : _label(p, p.baseIndex),
+      'smileRef': {
+        'has': p.smile != null,
+        'on': _smileRef,
+        'auto': _autoMatch,
+        'busy': _mBusy,
+      },
       'items': [for (final n in order) _label(p, n)],
       'subs': [for (final n in order) _sub(p, n)],
       'cmp': [for (final n in cmp) order.indexOf(n)],
@@ -1225,6 +1231,10 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
         _smileRemoteMake(p);
       case 'smileView':
         setState(() => _smileView = v == true && p.smileAfter != null);
+      case 'smileRef': // PC 😊 미소 사진도 참고해서 변환
+        setState(() => _smileRef = v == true);
+      case 'autoMatch': // PC 변환 후 미소 사진에 자동 매칭
+        setState(() => _autoMatch = v == true);
       case 'cmpRemove': // PC 비교 목록 ✕ (목록 위치 번호)
         if (v is int && v > 0 && v < p.listOrder.length) {
           _removePhoto(p, p.listOrder[v]);
@@ -1338,6 +1348,11 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
         : const <GuideLine>[];
     final eff = _engineNow();
     final base = p.baseBytes; // 원본 또는 목록에서 고른 변환 결과
+    // 😊 원본 2장: 미소 사진도 참고로 (미소 입술선·얼굴 중심에 맞는 치아로)
+    final useRef = _smileRefOn(p);
+    final refs = useRef
+        ? await smileRefs(p.smile!)
+        : const <({String label, Uint8List jpeg})>[];
     if (eff.engine != Engine.solo) {
       // 2단계 파이프라인: 1단계 FLUX(마진·형태) → 2단계 선택한 엔진(리얼리즘)
       try {
@@ -1346,6 +1361,8 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
           before: base,
           lines: p.lines.cervical,
           maskOverride: region,
+          refs: refs,
+          refPrompt: useRef ? kSmileRefPrompt : '',
           fluxPrompt: ClinicalPrompt.fluxPrompt(
             treatments: c.tx,
             teeth: sortTeeth(c.teeth),
@@ -1381,7 +1398,10 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
           before: base,
           guide: _useGuide ? p.lines.cervical : const [],
           lock: lock,
-          prompt: _aiPrompt(extra: fix),
+          prompt: useRef
+              ? '${_aiPrompt(extra: fix)}\n$kSmileRefPrompt'
+              : _aiPrompt(extra: fix),
+          refs: refs,
         );
         usedTag = Engine.solo.short;
       } on AiError catch (e) {
@@ -1393,6 +1413,8 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
       final src = await AiService.decodePhoto(base);
       after = await compute(protectOutside, (src, after, region));
     }
+    if (useRef && after != null && usedTag.isNotEmpty)
+      usedTag = '$usedTag · 미소 참고';
     return (after: after, fail: aiFail, notice: aiNotice, tag: usedTag);
   }
 
@@ -1505,8 +1527,16 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
         p.editing = false;
         _pos = 0.5;
       });
+      // 😊 원본 2장: 변환이 끝나면 미소 사진에 바로 정밀 매칭 (미소 미리보기까지)
+      // (최종 목표 = 미소 사진 결과. AI 를 끈 기본 방식으로 만들어도 맞춰 줌)
+      final autoMatch = aiFail == null && p.smile != null && _autoMatch;
+      if (autoMatch) {
+        Future.microtask(() => _matchAfterConvert(p));
+      }
       final np = noPrep;
-      if (np != null && aiFail == null) {
+      if (autoMatch) {
+        _toast('After가 만들어졌습니다. 😊 이어서 미소 사진에 맞추는 중…');
+      } else if (np != null && aiFail == null) {
         final v = np.verdict;
         _toast(
           v == null
@@ -3803,6 +3833,113 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
     );
   }
 
+  // ── 😊 원본 2장 (개구기 사진 + 미소 사진) ─────────────────────────
+  bool _smileRef = true; // 변환할 때 미소 사진도 참고
+  bool _autoMatch = true; // 변환 후 미소 사진에 자동 정밀 매칭
+  bool _smileRefOn(PatientPhoto p) => _useAi && _smileRef && p.smile != null;
+
+  Future<void> _matchAfterConvert(PatientPhoto p) async {
+    final after = p.afterBytes;
+    if (after == null || p.smile == null || !mounted) return;
+    _matchReset(p);
+    _mProsth = after;
+    _mLabel = _label(p, p.results.length);
+    _mRes = null;
+    await _matchRun(p);
+    if (!mounted) return;
+    if (_mRes != null) {
+      _toast('😊 미소 미리보기 완성! ${_mRes!.align.summary} · 왼쪽 목록에도 들어갔어요');
+    } else if (_mStep.isNotEmpty) {
+      _toast('😊 미소 사진에 맞추지 못했어요: $_mStep');
+    }
+  }
+
+  Widget _smileRefBox(PatientPhoto p) {
+    final sm = p.smile;
+    // CheckboxListTile 은 가까운 Material 위에 그려지므로 투명 Material 로 감쌈
+    return Material(
+      type: MaterialType.transparency,
+      child: _smileRefInner(p, sm),
+    );
+  }
+
+  Widget _smileRefInner(PatientPhoto p, Uint8List? sm) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppColors.gray200),
+      ),
+      child: sm == null
+          ? Row(
+              children: [
+                const Expanded(
+                  child: Text(
+                    '😊 원본 2장 방식: 미소 사진을 넣으면 미소에 어울리는 치아로 변환하고, 끝나면 미소 사진에 자동으로 맞춰 줘요',
+                    style: TextStyle(fontSize: 12, color: AppColors.gray500),
+                  ),
+                ),
+                const SizedBox(width: 6),
+                OutlinedButton(
+                  onPressed: () => _openSmile(p),
+                  child: const Text('😊 미소 사진 넣기'),
+                ),
+              ],
+            )
+          : Row(
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(6),
+                  child: Image.memory(
+                    sm,
+                    width: 56,
+                    height: 42,
+                    fit: BoxFit.cover,
+                    cacheWidth: 120,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      CheckboxListTile(
+                        dense: true,
+                        contentPadding: EdgeInsets.zero,
+                        visualDensity: VisualDensity.compact,
+                        value: _smileRef && _useAi,
+                        onChanged: _useAi
+                            ? (v) => setState(() => _smileRef = v ?? true)
+                            : null,
+                        title: const Text(
+                          '😊 미소 사진도 참고해서 변환 (원본 2장)',
+                          style: TextStyle(
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                      CheckboxListTile(
+                        dense: true,
+                        contentPadding: EdgeInsets.zero,
+                        visualDensity: VisualDensity.compact,
+                        value: _autoMatch,
+                        onChanged: (v) =>
+                            setState(() => _autoMatch = v ?? true),
+                        title: const Text(
+                          '변환 후 미소 사진에 자동으로 맞추기 (최종: 미소 결과)',
+                          style: TextStyle(fontSize: 12.5),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+    );
+  }
+
   /// 🔁 어떤 사진을 기준으로 변환하는지 (목록에서 결과를 누르면 바뀜)
   Widget _baseLine(PatientPhoto p) {
     final n = p.baseIndex;
@@ -3860,6 +3997,7 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
           ),
           const SizedBox(height: 6),
           _baseLine(_cur!),
+          _smileRefBox(_cur!),
           _aiRow(locked),
           Row(
             children: [

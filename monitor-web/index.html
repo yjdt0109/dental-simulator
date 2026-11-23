@@ -9,14 +9,14 @@
 <link rel="icon" href="icons/icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@500;600;700&family=Noto+Sans+KR:wght@400;500;700;800&display=swap">
-<link rel="stylesheet" href="style.css?v=3.31">
+<link rel="stylesheet" href="style.css?v=3.32">
 </head>
 <body>
 <header class="bar">
   <div class="logo" aria-hidden="true">
     <svg width="22" height="22" viewBox="0 0 100 100"><path d="M32 24C18 24 17 42 22 52C27 62 28 80 36 80C43 80 42 62 50 62C58 62 57 80 64 80C72 80 73 62 78 52C83 42 82 24 68 24C60 24 56 29 50 29C44 29 40 24 32 24Z" fill="none" stroke="#fff" stroke-width="6" stroke-linejoin="round"/><line x1="50" y1="14" x2="50" y2="88" stroke="#fff" stroke-width="5" stroke-linecap="round"/></svg>
   </div>
-  <div class="brand"><b>상담 모니터 <span class="ver">v3.31</span></b><small id="sub">B&amp;A 치과 시뮬레이터</small></div>
+  <div class="brand"><b>상담 모니터 <span class="ver">v3.32</span></b><small id="sub">B&amp;A 치과 시뮬레이터</small></div>
   <select id="roomName" aria-label="상담실 이름">
     <option>상담실 1</option><option>상담실 2</option><option>상담실 3</option><option>상담실 4</option><option>원장실</option><option>대기실 TV</option>
   </select>
@@ -279,6 +279,14 @@
         <input type="range" id="strength" min="30" max="100" step="5" value="90">
       </div>
 
+      <div class="smref" id="smRef" hidden>
+        <div id="smRefNone"><small>😊 <b>원본 2장 방식</b>: 미소 사진을 넣으면 미소에 어울리는 치아로 변환하고, 끝나면 미소 사진에 자동으로 맞춰 최종 미소 결과까지 만들어요</small>
+          <button type="button" class="btn sm" id="smRefAdd">😊 미소 사진 넣기</button></div>
+        <div id="smRefHas">
+          <label><input type="checkbox" id="smRefOn"> 😊 미소 사진도 참고해서 변환 (원본 2장)</label>
+          <label><input type="checkbox" id="smRefAuto"> 변환 후 미소 사진에 자동으로 맞추기 (최종: 미소 결과)</label>
+        </div>
+      </div>
       <small class="p-note convert-base" id="convertBase"></small>
       <button type="button" class="convert" id="convertBtn">✨ After 변환하기</button>
       <small class="p-note center" id="convertNote"></small>
@@ -403,7 +411,7 @@
 </div>
 
 <script src="qrcode.min.js"></script>
-<script type="module" src="app.js?v=3.31"></script>
+<script type="module" src="app.js?v=3.32"></script>
 <div class="toast" id="toast" hidden></div>
 </body>
 </html>

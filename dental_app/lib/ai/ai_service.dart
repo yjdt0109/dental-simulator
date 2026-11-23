@@ -97,6 +97,8 @@ class AiService {
     List<MaskStroke> mask = const [],
     List<GuideLine> guide = const [], // 서비컬 라인 (있으면 두 번째 사진으로 함께 보냄)
     List<GuideLine> lock = const [], // 이 선 바깥쪽 잇몸은 원본 픽셀로 고정
+    List<({String label, Uint8List jpeg})> refs =
+        const [], // 참고 사진 (예: 같은 환자 미소 사진)
   }) async {
     if (!ready) throw const AiError('AI 연결이 준비되지 않았습니다. 앱을 다시 실행해 주세요.');
     // 1) 원본 디코드 (긴 변 2000px 이하)
@@ -115,6 +117,7 @@ class AiService {
       prompt: prompt,
       jpeg: cropBytes,
       guideJpeg: guideBytes,
+      extra: refs,
     );
     if (roi == null) {
       return compute(_fullResult, (src, aiBytes, lock));
