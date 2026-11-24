@@ -28,7 +28,7 @@ class CastService extends ChangeNotifier {
   static final CastService instance = CastService._();
 
   /// 앱 버전 (PC 상담 모니터에 표시 → 태블릿이 최신 앱인지 확인용)
-  static const appVersion = '2026.11.23-b';
+  static const appVersion = '2026.11.24-a';
 
   /// PC 에서 받은 명령 수 (PC 가 '태블릿이 받았는지' 확인하는 데 씀)
   int cmdCount = 0;
@@ -371,6 +371,7 @@ class CastService extends ChangeNotifier {
     'samOv',
     'rzImg',
     'smileImg',
+    'recSync',
   ];
 
   /// rooms/{방}/[path] 에 값 쓰기 (자동 QA·보관함을 PC 에 보여 줄 때). null 이면 지움.

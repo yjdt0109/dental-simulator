@@ -87,7 +87,9 @@ class QaRemote {
     final store = PatientRecords.instance;
     await store.ensureLoaded();
     final list = store.search().take(150).toList();
-    final key = '${store.records.length}:${list.map((r) => r.id).join(',')}';
+    // 결과 수·미소 사진이 바뀌어도 다시 보냄 (PC 폴더 저장이 바뀐 기록을 다시 받도록)
+    final key =
+        '${store.records.length}:${list.map((r) => '${r.id}/${r.shots.length}/${r.hasSmile}').join(',')}';
     if (key == _lastRec) return;
     _lastRec = key;
     final items = <Map<String, Object?>>[];
@@ -110,6 +112,7 @@ class QaRemote {
       }
       items.add({
         ...r.toJson(),
+        'sig': pcSyncSig(r),
         'day': r.day,
         'dayText': r.dayText,
         'time': r.time,
@@ -399,6 +402,16 @@ class QaRemote {
           }
         }
         return true;
+      case 'recSyncReq': // PC 💾 폴더 저장: 이 기록의 사진·상담 내용을 보내 줘
+        final r = PatientRecords.instance.records
+            .where((x) => x.id == '$v')
+            .firstOrNull;
+        if (r == null) {
+          await _put('recSync', {'id': '$v', 'missing': true});
+          return true;
+        }
+        await _put('recSync', await pcSyncPayload(r));
+        return true;
       case 'recDel':
         final r = PatientRecords.instance.records
             .where((x) => x.id == '$v')
@@ -434,4 +447,75 @@ class QaRemote {
     _lastQa = _lastAr = _lastRec = null;
     _imgKey = -1;
   }
+}
+
+/// 💾 PC 폴더 저장: 이 값이 바뀌면 PC 가 다시 받음 (결과 수·미소 사진)
+String pcSyncSig(PatientRecord r) => '${r.shots.length}|${r.hasSmile}';
+
+String _safe(String s) =>
+    s.trim().replaceAll(RegExp(r'[\\/:*?"<>|\x00-\x1F]+'), '_').trim();
+
+String _two(int v) => v.toString().padLeft(2, '0');
+
+/// PC 에 만들 폴더: [환자이름, '2026-11-24 14시30분 상담 (라미네이트)']
+List<String> pcSyncFolder(PatientRecord r) {
+  final t = r.savedAt;
+  final name = _safe(r.name).isEmpty ? '이름 없음' : _safe(r.name);
+  final tx = r.treatments.isEmpty ? '치료 미선택' : r.treatments.join(', ');
+  return [
+    name,
+    _safe(
+      '${t.year}-${_two(t.month)}-${_two(t.day)} ${_two(t.hour)}시${_two(t.minute)}분 상담 ($tx)',
+    ),
+  ];
+}
+
+/// 기록 하나를 PC 로 (원본·결과·미소 사진 원본 그대로 + 상담 내용)
+Future<Map<String, Object?>> pcSyncPayload(PatientRecord r) async {
+  final store = PatientRecords.instance;
+  final files = <Map<String, String>>[];
+  Future<void> add(String f, String as) async {
+    final file = await store.file(r, f);
+    if (await file.exists()) {
+      files.add({'n': _safe(as), 'b': base64Encode(await file.readAsBytes())});
+    }
+  }
+
+  await add('before.jpg', '원본 (치료 전).jpg');
+  for (var i = 0; i < r.shots.length; i++) {
+    final s = r.shots[i];
+    await add(
+      s.file,
+      '${i + 1}번 시뮬레이션${s.engine.isEmpty ? '' : ' (${s.engine})'}.jpg',
+    );
+  }
+  if (r.hasSmile) {
+    await add('smile_before.jpg', '미소 (치료 전).jpg');
+    await add('smile_after.jpg', '미소 미리보기 (시뮬레이션).jpg');
+  }
+  final t = r.savedAt;
+  final memo = [
+    '환자: ${r.name}',
+    '상담 날짜: ${t.year}.${_two(t.month)}.${_two(t.day)} ${_two(t.hour)}:${_two(t.minute)}',
+    if (r.clinic.isNotEmpty) '치과: ${r.clinic}',
+    '사진: ${r.photoType.isEmpty ? '-' : r.photoType}',
+    '치료 항목: ${r.treatments.isEmpty ? '선택 안 함' : r.treatments.join(', ')}',
+    '치료 부위: ${r.teeth.isEmpty ? '-' : r.teeth.map((x) => '#$x').join(' ')}',
+    '희망 셰이드: ${r.shade ?? '선택 안 함'}',
+    '메모: ${r.memo.isEmpty ? '(없음)' : r.memo}',
+    '',
+    '[시뮬레이션 결과]',
+    for (var i = 0; i < r.shots.length; i++)
+      '${i + 1}번: ${r.shots[i].label}${r.shots[i].check.isEmpty ? '' : ' · ${r.shots[i].check}'}',
+    '',
+    '※ 이 폴더의 사진은 AI 시뮬레이션입니다. 실제 치료 완성 사진은 환자 폴더의 [치료완성] 폴더에 넣어 주세요.',
+  ].join('\r\n');
+  return {
+    'id': r.id,
+    'sig': pcSyncSig(r),
+    'folder': pcSyncFolder(r),
+    'memo': memo,
+    'files': files,
+    'at': DateTime.now().millisecondsSinceEpoch,
+  };
 }

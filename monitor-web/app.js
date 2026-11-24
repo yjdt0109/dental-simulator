@@ -108,7 +108,7 @@ function render() {
   const tabletView = state.view || 'edit';
   if (tabletView !== lastTabletView) { lastTabletView = tabletView; localView = null; }
   const items = Array.isArray(state.items) ? state.items.map(String) : ['원본'];
-  const subs = Array.isArray(state.subs) ? state.subs.map(String) : []; // 태블릿 2026.11.23-b 이상: 불러온 사진 설명
+  const subs = Array.isArray(state.subs) ? state.subs.map(String) : []; // 태블릿 2026.11.24-a 이상: 불러온 사진 설명
   const cmp = Array.isArray(state.cmp) ? state.cmp.filter((n) => Number.isInteger(n) && n < items.length) : [0];
   const hasAfterShown = tabletView !== 'edit' && images && images.after;
   // one: 비교 목록에서 1장만 고름 → 그 사진만 크게
@@ -314,7 +314,7 @@ function renderPanel(teeth, tx, view) {
   cb.classList.toggle('busy', busy);
   $('#convertBase').textContent = state.base ? `🔁 기준 사진: ${state.base} → 이 결과를 다듬어요 (원본으로 하려면 비교 목록에서 원본 클릭)` : '기준 사진: 원본 · 브리핑 비교 목록에서 변환 결과를 클릭하면 그 결과를 기준으로 다시 변환해요';
   $('#convertBase').classList.toggle('on', !!state.base);
-  // 😊 원본 2장 (태블릿 2026.11.23-b 이상)
+  // 😊 원본 2장 (태블릿 2026.11.24-a 이상)
   const sr = state.smileRef;
   $('#smRef').hidden = !sr || locked();
   if (sr) {
@@ -868,7 +868,8 @@ async function start() {
     if (!v || !v.png) { samImg = null; drawLines(); return; }
     const im = new Image(); im.onload = () => { samImg = im; drawLines(); }; im.src = 'data:image/png;base64,' + v.png;
   });
-  onValue(ref(db, base + '/records'), (s) => { records = s.val(); renderRecords(); });
+  onValue(ref(db, base + '/records'), (s) => { records = s.val(); renderRecords(); pcCheck(false); });
+  onValue(ref(db, base + '/recSync'), (s) => { pcGot(s.val()); });
   onValue(ref(db, base + '/recordFull'), (s) => { const v = s.val(); if (v) gotRecordFull(v); });
   onValue(ref(db, base + '/archiveMsg'), (s) => { const v = s.val(); if (v && v.at > openedAt) archMsg(v.text); });
   render();
@@ -922,7 +923,7 @@ function renderQa() {
   const running = !!q.running;
   const newApp = !!qa;
   const warn = !qaConnected() ? '태블릿이 연결되어 있지 않습니다. QR 로 연결해 주세요.'
-    : !newApp ? '태블릿 앱을 최신 버전(2026.11.23-b 이상)으로 업데이트해야 자동 QA 를 PC 에서 쓸 수 있습니다.'
+    : !newApp ? '태블릿 앱을 최신 버전(2026.11.24-a 이상)으로 업데이트해야 자동 QA 를 PC 에서 쓸 수 있습니다.'
     : !(images && images.before) ? '태블릿에서 환자 사진을 먼저 올려 주세요 (PC 의 [사진 올리기] 도 가능).'
     : q.ready === false ? '태블릿의 AI 연결이 준비되지 않았습니다 (태블릿 [API 키 설정] 확인).' : '';
   $('#qaWarn').hidden = !warn; $('#qaWarn').textContent = warn;
@@ -1046,7 +1047,7 @@ function renderArchive() {
   const a = archive;
   if (!qaConnected() || !a) {
     setHtml($('#archFolders'), '');
-    setHtml($('#archGrid'), `<p class="empty">${!qaConnected() ? '태블릿을 연결하면 태블릿에 저장된 보관함이 보입니다.' : '보관함이 비어 있거나, 태블릿 앱 업데이트(2026.11.23-b 이상)가 필요합니다.'}</p>`);
+    setHtml($('#archGrid'), `<p class="empty">${!qaConnected() ? '태블릿을 연결하면 태블릿에 저장된 보관함이 보입니다.' : '보관함이 비어 있거나, 태블릿 앱 업데이트(2026.11.24-a 이상)가 필요합니다.'}</p>`);
     return;
   }
   const folders = a.folders || [];
@@ -1163,7 +1164,7 @@ function renderRecords() {
   if ($('#recOv').hidden) return;
   if (!qaConnected() || !records) {
     setHtml($('#recTx'), ''); $('#recCount').textContent = '';
-    setHtml($('#recTree'), `<p class="empty">${!qaConnected() ? '태블릿을 연결하면 태블릿에 저장된 환자 기록이 보입니다.' : '아직 저장된 기록이 없거나, 태블릿 앱 업데이트(2026.11.23-b 이상)가 필요합니다.'}</p>`);
+    setHtml($('#recTree'), `<p class="empty">${!qaConnected() ? '태블릿을 연결하면 태블릿에 저장된 환자 기록이 보입니다.' : '아직 저장된 기록이 없거나, 태블릿 앱 업데이트(2026.11.24-a 이상)가 필요합니다.'}</p>`);
     return;
   }
   setHtml($('#recTx'), TX_ALL.map((t) => `<button type="button" data-tx="${esc(t)}" class="${recTx === t ? 'on' : ''}" aria-pressed="${recTx === t}">${esc(t)}</button>`).join(''));
@@ -1456,7 +1457,7 @@ function renderSmile(view) {
   $('#smMake').textContent = sm.busy ? '⏳ 처리 중…' : sm.made ? '😊 다시 입히기' : '😊 미소에 입히기';
   $('#smHint').textContent = !sm.has ? '사진을 올리면 입술 사이 치아를 자동으로 찾아요' : sm.n > 0 ? `치아 영역 ${sm.n}개 선택됨` : '🪄 미소 사진 속 치아를 클릭해 고르세요';
   $('#smMsg').textContent = sm.msg || '';
-  // 🦷 보철 사진 정밀 매칭 (태블릿 앱 2026.11.23-b 이상)
+  // 🦷 보철 사진 정밀 매칭 (태블릿 앱 2026.11.24-a 이상)
   $('#smMatch').hidden = !mm;
   if (mm) {
     const busy = !!mm.busy;
@@ -1518,6 +1519,136 @@ async function sendOne(f, cmdName, msgEl, what) {
 $('#smFile').addEventListener('change', (e) => sendPhoto(e, 'smilePhoto', '#smMsg', '미소 사진'));
 $('#pickFile').addEventListener('change', (e) => sendPhoto(e, 'extraPhoto', '#pickMsg', '사진'));
 $('#smP2File').addEventListener('change', (e) => sendPhoto(e, 'matchPhoto', '#smMatchMsg', '보철 사진'));
+
+// =============================================================================
+// 💾 PC 폴더에 환자 기록 자동 저장 (v3.34) — 크롬·엣지 File System Access
+//   환자이름 / 2026-11-24 14시30분 상담 (치료) / 원본·결과·미소·상담내용.txt
+//   환자이름 / 치료완성 /  ← 실제 보철·교정 완성 사진 넣는 곳
+// =============================================================================
+const PC_MANIFEST = '_B&A 기록목록.json';
+let pcDir = null, pcDirState = 'none', pcManifest = { since: 0, recs: {} };
+let pcQueue = [], pcBusy = null, pcBusyTimer = 0;
+function pcIdb() {
+  return new Promise((res, rej) => {
+    const r = indexedDB.open('bna-pc', 1);
+    r.onupgradeneeded = () => r.result.createObjectStore('kv');
+    r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error);
+  });
+}
+async function kvGet(k) {
+  try { const d = await pcIdb(); return await new Promise((res) => { const q = d.transaction('kv').objectStore('kv').get(k); q.onsuccess = () => res(q.result); q.onerror = () => res(null); }); } catch (e) { return null; }
+}
+async function kvSet(k, v) {
+  try { const d = await pcIdb(); await new Promise((res) => { const t = d.transaction('kv', 'readwrite'); t.objectStore('kv').put(v, k); t.oncomplete = res; t.onerror = res; }); } catch (e) { /* 저장 못 해도 이번 실행에는 사용 */ }
+}
+async function pcPerm(h, ask) {
+  if (!h.queryPermission) return true;
+  const o = { mode: 'readwrite' };
+  let p = await h.queryPermission(o);
+  if (p === 'granted') return true;
+  if (ask && h.requestPermission) p = await h.requestPermission(o);
+  return p === 'granted';
+}
+async function pcSaveManifest() {
+  const w = await (await pcDir.getFileHandle(PC_MANIFEST, { create: true })).createWritable();
+  await w.write(JSON.stringify(pcManifest, null, 1)); await w.close();
+}
+async function pcLoadManifest() {
+  try {
+    const f = await (await pcDir.getFileHandle(PC_MANIFEST)).getFile();
+    pcManifest = JSON.parse(await f.text()); pcManifest.recs = pcManifest.recs || {};
+  } catch (e) {
+    pcManifest = { since: Date.now(), recs: {} }; // 이 시각 이후 저장되는 기록부터 자동
+    await pcSaveManifest();
+  }
+}
+async function pcUse(h, ask) {
+  pcDir = h;
+  if (!(await pcPerm(h, ask))) { pcDirState = 'perm'; renderPcSave(); return; }
+  pcDirState = 'on';
+  await pcLoadManifest();
+  renderPcSave(); pcCheck(false);
+}
+function pcMissing(all) {
+  const items = (records && records.items) || [];
+  return items.filter((r) => {
+    const m = pcManifest.recs[r.id];
+    if (m) return r.sig && m.sig !== r.sig; // 결과·미소 사진이 늘어난 기록은 다시
+    return all || Date.parse(r.savedAt) >= (pcManifest.since || 0) - 60000;
+  }).map((r) => r.id);
+}
+function pcCheck(all) {
+  if (pcDirState !== 'on') { renderPcSave(); return; }
+  for (const id of pcMissing(all)) if (!pcQueue.includes(id) && pcBusy !== id) pcQueue.push(id);
+  renderPcSave(); pcPump();
+}
+function pcPump() {
+  if (pcBusy || !pcQueue.length || !db || pcDirState !== 'on') return;
+  pcBusy = pcQueue.shift();
+  cmd('recSyncReq', pcBusy);
+  clearTimeout(pcBusyTimer);
+  pcBusyTimer = setTimeout(() => { pcBusy = null; renderPcSave(); pcPump(); }, 90000); // 응답이 없으면 다음 것
+  renderPcSave();
+}
+function pcB64(b) { const s = atob(b); const u = new Uint8Array(s.length); for (let i = 0; i < s.length; i++) u[i] = s.charCodeAt(i); return u; }
+async function pcWriteFile(dir, name, data) {
+  const w = await (await dir.getFileHandle(name, { create: true })).createWritable();
+  await w.write(data); await w.close();
+}
+async function pcGot(v) {
+  if (!v || !v.id || v.id !== pcBusy || !pcDir) return;
+  clearTimeout(pcBusyTimer);
+  try {
+    if (!v.missing) {
+      const [pname, cname] = v.folder || ['이름 없음', v.id];
+      const pd = await pcDir.getDirectoryHandle(pname, { create: true });
+      await pd.getDirectoryHandle('치료완성', { create: true });
+      const cd = await pd.getDirectoryHandle(cname, { create: true });
+      for (const f of v.files || []) await pcWriteFile(cd, f.n, pcB64(f.b));
+      await pcWriteFile(cd, '상담내용.txt', new Blob(['﻿' + (v.memo || '')], { type: 'text/plain' }));
+      pcManifest.recs[v.id] = { sig: v.sig, folder: pname + '/' + cname, at: Date.now() };
+      await pcSaveManifest();
+      pcToast(`💾 ${pname} 님 기록을 PC 폴더(${pcDir.name} › ${pname})에 저장했습니다`);
+    }
+  } catch (e) {
+    console.error(e);
+    pcToast('💾 PC 폴더에 저장하지 못했습니다 · 저장 폴더를 다시 연결해 주세요');
+    pcDirState = 'perm';
+  }
+  remove(ref(db, 'rooms/' + room + '/recSync')).catch(() => {});
+  pcBusy = null; renderPcSave(); pcPump();
+}
+function pcToast(m) {
+  const t = $('#toast'); if (!t) return;
+  t.textContent = m; t.hidden = false;
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => { t.hidden = true; }, 5000);
+}
+function renderPcSave() {
+  const ok = 'showDirectoryPicker' in window || !!window.__pcDirOverride;
+  const st = $('#pcSaveState'); if (!st) return;
+  const n = Object.keys(pcManifest.recs || {}).length;
+  const left = pcDirState === 'on' ? pcMissing(true).length : 0;
+  st.textContent = !ok ? '이 브라우저는 폴더 저장을 못 해요 (크롬·엣지에서 열어 주세요)'
+    : pcDirState === 'on' ? `켜짐 · 📁 ${pcDir.name} · 저장된 기록 ${n}건${pcBusy ? ' · 저장 중…' : ''}${left ? ` · 아직 PC에 없는 기록 ${left}건` : ''}`
+      : pcDirState === 'perm' ? `📁 ${pcDir ? pcDir.name : ''} · 다시 연결이 필요해요 ([저장 폴더 다시 연결])`
+        : '아직 저장 폴더를 고르지 않았어요';
+  $('#pcPick').disabled = !ok;
+  $('#pcPick').textContent = pcDirState === 'none' ? '📁 저장 폴더 고르기' : '📁 저장 폴더 바꾸기';
+  $('#pcReauth').hidden = pcDirState !== 'perm';
+  $('#pcCatch').hidden = !(pcDirState === 'on' && left > 0);
+  $('#pcCatch').textContent = `⬇ 빠진 기록 PC로 가져오기 (${left}건)`;
+}
+$('#pcPick').addEventListener('click', async () => {
+  try {
+    const h = window.__pcDirOverride || (await window.showDirectoryPicker({ id: 'bna-records', mode: 'readwrite' }));
+    await kvSet('pcDir', h);
+    await pcUse(h, true);
+    pcToast(`💾 이제 환자 기록을 PC 폴더 [${h.name}]에도 자동 저장합니다`);
+  } catch (e) { if (e && e.name !== 'AbortError') pcToast('폴더를 고르지 못했습니다'); }
+});
+$('#pcReauth').addEventListener('click', async () => { if (pcDir) await pcUse(pcDir, true); });
+$('#pcCatch').addEventListener('click', () => pcCheck(true));
+(async () => { const h = window.__pcDirOverride || (await kvGet('pcDir')); if (h) await pcUse(h, false); else renderPcSave(); })();
 
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
 start();

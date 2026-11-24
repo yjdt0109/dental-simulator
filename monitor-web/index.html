@@ -9,14 +9,14 @@
 <link rel="icon" href="icons/icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@500;600;700&family=Noto+Sans+KR:wght@400;500;700;800&display=swap">
-<link rel="stylesheet" href="style.css?v=3.33">
+<link rel="stylesheet" href="style.css?v=3.34">
 </head>
 <body>
 <header class="bar">
   <div class="logo" aria-hidden="true">
     <svg width="22" height="22" viewBox="0 0 100 100"><path d="M32 24C18 24 17 42 22 52C27 62 28 80 36 80C43 80 42 62 50 62C58 62 57 80 64 80C72 80 73 62 78 52C83 42 82 24 68 24C60 24 56 29 50 29C44 29 40 24 32 24Z" fill="none" stroke="#fff" stroke-width="6" stroke-linejoin="round"/><line x1="50" y1="14" x2="50" y2="88" stroke="#fff" stroke-width="5" stroke-linecap="round"/></svg>
   </div>
-  <div class="brand"><b>상담 모니터 <span class="ver">v3.33</span></b><small id="sub">B&amp;A 치과 시뮬레이터</small></div>
+  <div class="brand"><b>상담 모니터 <span class="ver">v3.34</span></b><small id="sub">B&amp;A 치과 시뮬레이터</small></div>
   <select id="roomName" aria-label="상담실 이름">
     <option>상담실 1</option><option>상담실 2</option><option>상담실 3</option><option>상담실 4</option><option>원장실</option><option>대기실 TV</option>
   </select>
@@ -379,6 +379,15 @@
       <button class="btn icon" type="button" data-close="recOv" aria-label="닫기">✕</button>
     </div>
     <div class="ov-body">
+      <div class="pcsave" id="pcSave">
+        <div><b>💾 PC 폴더에 자동 저장</b> <small id="pcSaveState">아직 저장 폴더를 고르지 않았어요</small></div>
+        <div class="pcsave-acts">
+          <button class="btn sm primary" type="button" id="pcPick">📁 저장 폴더 고르기</button>
+          <button class="btn sm" type="button" id="pcReauth" hidden>🔓 저장 폴더 다시 연결</button>
+          <button class="btn sm" type="button" id="pcCatch" hidden>⬇ 빠진 기록 PC로 가져오기</button>
+        </div>
+        <small class="p-note">태블릿에서 [저장 및 상담 완료]를 하면 이 PC 폴더에도 <b>환자이름 › 날짜 상담</b> 폴더로 자동 저장돼요 (환자 폴더 안에 실제 완성 사진용 <b>치료완성</b> 폴더도 만들어 둠). 크롬·엣지에서 상담 모니터가 켜져 있을 때 저장됩니다.</small>
+      </div>
       <div class="rec-search">
         <input type="search" id="recQ" placeholder="이름 · 날짜(예: 11.18) · 치료종류로 검색" aria-label="검색">
         <label class="rec-date">📅 <input type="date" id="recDay" aria-label="날짜로 찾기"></label>
@@ -411,7 +420,7 @@
 </div>
 
 <script src="qrcode.min.js"></script>
-<script type="module" src="app.js?v=3.33"></script>
+<script type="module" src="app.js?v=3.34"></script>
 <div class="toast" id="toast" hidden></div>
 </body>
 </html>
