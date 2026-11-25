@@ -105,10 +105,11 @@ function render() {
   $('#panelBtn').setAttribute('aria-pressed', String(panelOn));
 
   showNotice(state.notice);
+  renderSlots();
   const tabletView = state.view || 'edit';
   if (tabletView !== lastTabletView) { lastTabletView = tabletView; localView = null; }
   const items = Array.isArray(state.items) ? state.items.map(String) : ['원본'];
-  const subs = Array.isArray(state.subs) ? state.subs.map(String) : []; // 태블릿 2026.11.24-a 이상: 불러온 사진 설명
+  const subs = Array.isArray(state.subs) ? state.subs.map(String) : []; // 태블릿 2026.11.25-a 이상: 불러온 사진 설명
   const cmp = Array.isArray(state.cmp) ? state.cmp.filter((n) => Number.isInteger(n) && n < items.length) : [0];
   const hasAfterShown = tabletView !== 'edit' && images && images.after;
   // one: 비교 목록에서 1장만 고름 → 그 사진만 크게
@@ -314,7 +315,7 @@ function renderPanel(teeth, tx, view) {
   cb.classList.toggle('busy', busy);
   $('#convertBase').textContent = state.base ? `🔁 기준 사진: ${state.base} → 이 결과를 다듬어요 (원본으로 하려면 비교 목록에서 원본 클릭)` : '기준 사진: 원본 · 브리핑 비교 목록에서 변환 결과를 클릭하면 그 결과를 기준으로 다시 변환해요';
   $('#convertBase').classList.toggle('on', !!state.base);
-  // 😊 원본 2장 (태블릿 2026.11.24-a 이상)
+  // 😊 원본 2장 (태블릿 2026.11.25-a 이상)
   const sr = state.smileRef;
   $('#smRef').hidden = !sr || locked();
   if (sr) {
@@ -854,6 +855,7 @@ async function start() {
   onValue(ref(db, base + '/qaImg'), (s) => { qaImg = s.val(); renderQa(); });
   onValue(ref(db, base + '/archive'), (s) => { archive = s.val(); renderArchive(); });
   onValue(ref(db, base + '/archiveFull'), (s) => { const v = s.val(); if (v) gotBackup(v); });
+  onValue(ref(db, base + '/slotImg'), (s) => { slotImg = s.val() || {}; renderSlots(); });
   onValue(ref(db, base + '/smileImg'), (s) => {
     smileData = s.val();
     showSmileImg();
@@ -923,7 +925,7 @@ function renderQa() {
   const running = !!q.running;
   const newApp = !!qa;
   const warn = !qaConnected() ? '태블릿이 연결되어 있지 않습니다. QR 로 연결해 주세요.'
-    : !newApp ? '태블릿 앱을 최신 버전(2026.11.24-a 이상)으로 업데이트해야 자동 QA 를 PC 에서 쓸 수 있습니다.'
+    : !newApp ? '태블릿 앱을 최신 버전(2026.11.25-a 이상)으로 업데이트해야 자동 QA 를 PC 에서 쓸 수 있습니다.'
     : !(images && images.before) ? '태블릿에서 환자 사진을 먼저 올려 주세요 (PC 의 [사진 올리기] 도 가능).'
     : q.ready === false ? '태블릿의 AI 연결이 준비되지 않았습니다 (태블릿 [API 키 설정] 확인).' : '';
   $('#qaWarn').hidden = !warn; $('#qaWarn').textContent = warn;
@@ -1047,7 +1049,7 @@ function renderArchive() {
   const a = archive;
   if (!qaConnected() || !a) {
     setHtml($('#archFolders'), '');
-    setHtml($('#archGrid'), `<p class="empty">${!qaConnected() ? '태블릿을 연결하면 태블릿에 저장된 보관함이 보입니다.' : '보관함이 비어 있거나, 태블릿 앱 업데이트(2026.11.24-a 이상)가 필요합니다.'}</p>`);
+    setHtml($('#archGrid'), `<p class="empty">${!qaConnected() ? '태블릿을 연결하면 태블릿에 저장된 보관함이 보입니다.' : '보관함이 비어 있거나, 태블릿 앱 업데이트(2026.11.25-a 이상)가 필요합니다.'}</p>`);
     return;
   }
   const folders = a.folders || [];
@@ -1164,7 +1166,7 @@ function renderRecords() {
   if ($('#recOv').hidden) return;
   if (!qaConnected() || !records) {
     setHtml($('#recTx'), ''); $('#recCount').textContent = '';
-    setHtml($('#recTree'), `<p class="empty">${!qaConnected() ? '태블릿을 연결하면 태블릿에 저장된 환자 기록이 보입니다.' : '아직 저장된 기록이 없거나, 태블릿 앱 업데이트(2026.11.24-a 이상)가 필요합니다.'}</p>`);
+    setHtml($('#recTree'), `<p class="empty">${!qaConnected() ? '태블릿을 연결하면 태블릿에 저장된 환자 기록이 보입니다.' : '아직 저장된 기록이 없거나, 태블릿 앱 업데이트(2026.11.25-a 이상)가 필요합니다.'}</p>`);
     return;
   }
   setHtml($('#recTx'), TX_ALL.map((t) => `<button type="button" data-tx="${esc(t)}" class="${recTx === t ? 'on' : ''}" aria-pressed="${recTx === t}">${esc(t)}</button>`).join(''));
@@ -1457,7 +1459,7 @@ function renderSmile(view) {
   $('#smMake').textContent = sm.busy ? '⏳ 처리 중…' : sm.made ? '😊 다시 입히기' : '😊 미소에 입히기';
   $('#smHint').textContent = !sm.has ? '사진을 올리면 입술 사이 치아를 자동으로 찾아요' : sm.n > 0 ? `치아 영역 ${sm.n}개 선택됨` : '🪄 미소 사진 속 치아를 클릭해 고르세요';
   $('#smMsg').textContent = sm.msg || '';
-  // 🦷 보철 사진 정밀 매칭 (태블릿 앱 2026.11.24-a 이상)
+  // 🦷 보철 사진 정밀 매칭 (태블릿 앱 2026.11.25-a 이상)
   $('#smMatch').hidden = !mm;
   if (mm) {
     const busy = !!mm.busy;
@@ -1519,6 +1521,57 @@ async function sendOne(f, cmdName, msgEl, what) {
 $('#smFile').addEventListener('change', (e) => sendPhoto(e, 'smilePhoto', '#smMsg', '미소 사진'));
 $('#pickFile').addEventListener('change', (e) => sendPhoto(e, 'extraPhoto', '#pickMsg', '사진'));
 $('#smP2File').addEventListener('change', (e) => sendPhoto(e, 'matchPhoto', '#smMatchMsg', '보철 사진'));
+
+// =============================================================================
+// 🖼 원본 2슬롯 (v3.35): 원본 1 미소 · 원본 2 개구기 · 변환할 사진 고르기 · 2단계 최종 미소
+// =============================================================================
+let slotImg = {}, slotUploadTo = 0;
+function renderSlots() {
+  const bar = $('#slotBar'); if (!bar) return;
+  const sl = state && state.slots;
+  bar.hidden = !sl || !!state.briefing || locked();
+  if (bar.hidden) return;
+  const fin = sl.final || {};
+  for (const k of [1, 2]) {
+    const b = bar.querySelector(`.slot[data-slot="${k}"]`);
+    const has = !!sl['s' + k], sel = sl.cur === k;
+    const th = slotImg['s' + k];
+    const im = b.querySelector('img');
+    im.hidden = !th; if (th) im.src = 'data:image/jpeg;base64,' + th;
+    b.querySelector('.ph').hidden = !!th;
+    b.classList.toggle('on', sel);
+    b.disabled = !!state.converting || !!fin.busy;
+    b.querySelector('small').textContent = !has ? '눌러서 사진 올리기' : sel ? '변환할 사진 (선택됨) · 우클릭: 사진 바꾸기' : '눌러서 이 사진 변환 · 우클릭: 사진 바꾸기';
+  }
+  $('#finalBtn').disabled = !fin.can || !!fin.busy;
+  $('#finalBtn').textContent = fin.busy ? '⏳ 2단계 만드는 중…' : '✨ 2단계 · 최종 미소 만들기';
+  $('#finalNote').textContent = fin.msg || (!sl.s1 ? '원본 1(미소)을 넣고 1단계 After를 만들면 2단계를 할 수 있어요'
+    : !fin.can ? '1단계: 변환할 사진을 고르고 [After 변환하기]' : '원본 1 + After 치열 → 입술·얼굴 그대로, 치아만 바꿔요');
+}
+$('#slotBar').addEventListener('click', (e) => {
+  const b = e.target.closest('.slot'); if (!b || b.disabled || !state || !state.slots) return;
+  const k = Number(b.dataset.slot);
+  if (!state.slots['s' + k]) { slotUploadTo = k; $('#slotFile').click(); return; }
+  cmd('slotSelect', k);
+});
+$('#slotBar').addEventListener('contextmenu', (e) => {
+  const b = e.target.closest('.slot'); if (!b || b.disabled) return;
+  e.preventDefault(); slotUploadTo = Number(b.dataset.slot); $('#slotFile').click();
+});
+$('#slotFile').addEventListener('change', async (e) => {
+  const f = e.target.files && e.target.files[0]; e.target.value = '';
+  if (!f || !slotUploadTo) return;
+  try {
+    const bmp = await createImageBitmap(f, { imageOrientation: 'from-image' });
+    const k = Math.min(1, 2400 / Math.max(bmp.width, bmp.height));
+    const c = document.createElement('canvas');
+    c.width = Math.round(bmp.width * k); c.height = Math.round(bmp.height * k);
+    c.getContext('2d').drawImage(bmp, 0, 0, c.width, c.height);
+    cmd('slotPhoto', { s: slotUploadTo, b: c.toDataURL('image/jpeg', 0.92).split(',')[1] });
+    $('#finalNote').textContent = `원본 ${slotUploadTo} 사진을 태블릿으로 보내는 중…`;
+  } catch (err) { console.error(err); $('#finalNote').textContent = '사진을 보내지 못했습니다'; }
+});
+$('#finalBtn').addEventListener('click', () => { cmd('finalSmile'); $('#finalNote').textContent = '✨ 2단계를 시작합니다…'; });
 
 // =============================================================================
 // 💾 PC 폴더에 환자 기록 자동 저장 (v3.34) — 크롬·엣지 File System Access

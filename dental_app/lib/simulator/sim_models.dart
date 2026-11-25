@@ -178,12 +178,22 @@ class PatientPhoto {
     List<String> planTx = const [],
     List<int> planTeeth = const [],
     String planShade = 'A1',
-  }) : consult = Consult(
-         name: name,
-         tx: {...planTx},
-         teeth: {...planTeeth},
-         shade: planShade,
-       );
+    Consult? sharedConsult,
+    this.slot = 2,
+  }) : consult =
+           sharedConsult ??
+           Consult(
+             name: name,
+             tx: {...planTx},
+             teeth: {...planTeeth},
+             shade: planShade,
+           );
+
+  /// 원본 슬롯: 1 = 자연스러운 미소(Base Smile), 2 = 개구기(Retractor View)
+  final int slot;
+
+  /// 같은 환자의 다른 슬롯 사진 (원본 1 ↔ 원본 2). 상담 내용(Consult)은 함께 씀
+  PatientPhoto? pair;
 
   final String id;
   final String name;
@@ -227,11 +237,16 @@ class PatientPhoto {
   final List<ExtraPhoto> extras = [];
 
   /// 같은 사진이 이미 있으면 그 번호, 아니면 새로 넣고 그 번호 (-1, -2 …)
-  int addExtra(Uint8List bytes, String label, {String sub = ''}) {
+  int addExtra(
+    Uint8List bytes,
+    String label, {
+    String sub = '',
+    Uint8List? pair, // 같은 촬영의 짝 (예: Final Smile → 원본 1)
+  }) {
     for (var i = 0; i < extras.length; i++) {
       if (identical(extras[i].bytes, bytes)) return -(i + 1);
     }
-    extras.add(ExtraPhoto(bytes, label, sub: sub));
+    extras.add(ExtraPhoto(bytes, label, sub: sub, pair: pair));
     return -extras.length;
   }
 
@@ -410,8 +425,9 @@ class PatientPhoto {
 
 /// 비교 목록에 더 불러온 사진 한 장
 class ExtraPhoto {
-  const ExtraPhoto(this.bytes, this.label, {this.sub = ''});
+  const ExtraPhoto(this.bytes, this.label, {this.sub = '', this.pair});
   final Uint8List bytes;
+  final Uint8List? pair;
   final String label; // 예: 😊 미소 1
   final String sub; // 예: 치료 전 / 미소 미리보기 / 환자 기록
 }

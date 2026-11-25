@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
@@ -37,6 +38,7 @@ import 'smile_screen.dart';
 import '../records/record_photo_picker.dart';
 import '../ai/smile.dart' show makeSmile;
 import '../ai/smile_match.dart';
+import '../ai/final_smile.dart';
 import '../privacy/mouth_finder.dart';
 
 import 'package:image/image.dart' as img;
@@ -145,7 +147,12 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
 
   void _onCastChanged() {
     final now = CastService.instance.connected;
-    if (now && !_castWasConnected) _pushCast();
+    if (now && !_castWasConnected) {
+      _slotImgKey = null; // 새로 연결되면 원본 슬롯 사진도 다시 보냄
+      _pushCast();
+      final c = _cur;
+      if (c != null) Future.microtask(() => _smilePublish(c));
+    }
     _castWasConnected = now;
   }
 
@@ -214,6 +221,12 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
       'redo': p.future.isEmpty ? null : p.future.last.label,
       'notice': _noticeAt == 0 ? null : {'m': _notice, 'at': _noticeAt},
       'base': p.baseIndex == 0 ? '' : _label(p, p.baseIndex),
+      'slots': {
+        'cur': p.slot,
+        's1': _slot1Bytes(p) != null,
+        's2': _slotPhoto(p, 2) != null,
+        'final': {'can': _finalReady(p), 'busy': _finalBusy, 'msg': _finalMsg},
+      },
       'smileRef': {
         'has': p.smile != null,
         'on': _smileRef,
@@ -1234,6 +1247,17 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
         _smileRemoteMake(p);
       case 'smileView':
         setState(() => _smileView = v == true && p.smileAfter != null);
+      case 'slotSelect': // PC 변환할 원본 고르기 (1 미소 / 2 개구기)
+        if (v == 1 || v == 2) _slotSelect(p, v as int);
+      case 'slotPhoto': // PC 원본 슬롯에 사진 올리기 {s, b}
+        if (v is Map && (v['s'] == 1 || v['s'] == 2) && v['b'] is String) {
+          final b = v['b'] as String;
+          if (b.length < 12000000) {
+            _setSlot(p, v['s'] as int, base64Decode(b), fromPc: true);
+          }
+        }
+      case 'finalSmile': // PC 2단계 최종 미소 만들기
+        _finalSmile(p);
       case 'smileRef': // PC 😊 미소 사진도 참고해서 변환
         setState(() => _smileRef = v == true);
       case 'autoMatch': // PC 변환 후 미소 사진에 자동 매칭
@@ -2254,6 +2278,7 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
         children: [
           _viewerHead(p, mode),
           const SizedBox(height: 10),
+          if (!_briefing) ...[_slotBar(p), const SizedBox(height: 10)],
           if (fill)
             Expanded(child: stage)
           else
@@ -2427,6 +2452,16 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
     if (!mounted) return;
     setState(() {});
     if (!CastService.instance.connected || !identical(p, _cur)) return;
+    // 원본 1·2 슬롯 작은 사진 (PC 카드)
+    final s1 = _slot1Bytes(p), s2 = _slotPhoto(p, 2)?.beforeBytes;
+    final sk = '${identityHashCode(s1)}|${identityHashCode(s2)}';
+    if (sk != _slotImgKey) {
+      _slotImgKey = sk;
+      CastService.instance.put('slotImg', {
+        if (s1 != null) 's1': await jpegBase64(s1, maxSide: 240, quality: 70),
+        if (s2 != null) 's2': await jpegBase64(s2, maxSide: 240, quality: 70),
+      });
+    }
     final sm = p.smile;
     if (sm == null) {
       CastService.instance.put('smileImg', null);
@@ -2915,7 +2950,10 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
   /// 원본 / 김민수 1번 / 김민수 2번 …
   String _label(PatientPhoto p, int n) {
     if (n < 0) return -n <= p.extras.length ? p.extras[-n - 1].label : '사진';
-    if (n == 0) return '원본';
+    if (n == 0) {
+      if (p.slot == 1) return '원본 1 (미소)';
+      return p.pair != null ? '원본 2 (개구기)' : '원본';
+    }
     final name = p.consult.name.trim();
     final r = n <= p.results.length ? p.results[n - 1] : null;
     final e = r?.engine ?? '';
@@ -2931,7 +2969,7 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
   String _sub(PatientPhoto p, int n) => n == 0
       ? '치료 전'
       : n > 0
-      ? '시뮬레이션'
+      ? 'After'
       : (-n <= p.extras.length ? p.extras[-n - 1].sub : '');
 
   /// 원본 윤곽 점선은 변환 결과에만
@@ -3838,9 +3876,368 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
     );
   }
 
+  // ── 🖼 원본 2슬롯: 원본 1(자연스러운 미소) · 원본 2(개구기) ─────────────
+  PatientPhoto? _slotPhoto(PatientPhoto p, int k) =>
+      p.slot == k ? p : (p.pair?.slot == k ? p.pair : null);
+
+  /// 원본 1(미소) 사진: 슬롯 1 사진, 없으면 미소 미리보기에 넣은 미소 사진
+  Uint8List? _slot1Bytes(PatientPhoto p) =>
+      _slotPhoto(p, 1)?.beforeBytes ?? (p.slot == 2 ? p.smile : null);
+
+  /// 2단계에 쓸 After: 지금 사진의 After, 없으면 짝 사진의 After
+  Uint8List? _finalAfter(PatientPhoto p) =>
+      _shownAfter(p) ?? (p.pair == null ? null : _shownAfter(p.pair!));
+
+  bool _finalReady(PatientPhoto p) =>
+      _slot1Bytes(p) != null && _finalAfter(p) != null && !_finalBusy;
+
+  bool _finalBusy = false;
+  String? _slotImgKey;
+  String _finalMsg = '';
+
+  Future<PatientPhoto> _makeSlotPhoto(
+    Uint8List bytes,
+    int k,
+    Consult consult,
+  ) async {
+    final im = await decodeImageFromList(bytes);
+    _uploadSeq++;
+    final np = PatientPhoto(
+      id: 'u$_uploadSeq',
+      name: consult.name.isEmpty ? '새 환자 $_uploadSeq' : consult.name,
+      type: k == 1 ? '원본 1 · 자연스러운 미소' : '원본 2 · 개구기',
+      time: '방금',
+      beforeBytes: bytes,
+      imageSize: Size(im.width.toDouble(), im.height.toDouble()),
+      sharedConsult: consult,
+      slot: k,
+    );
+    im.dispose();
+    return np;
+  }
+
+  /// 슬롯에 사진 넣기 (빈 슬롯 → 짝으로 추가 / 찬 슬롯 → 그 슬롯 사진을 새로 바꿈)
+  Future<void> _setSlot(
+    PatientPhoto p,
+    int k,
+    Uint8List bytes, {
+    bool fromPc = false,
+  }) async {
+    var data = bytes;
+    if (k == 2 && _eyeMask && EyeMasker.supported) {
+      try {
+        data = await EyeMasker.mask(bytes) ?? bytes; // 개구기 사진만 눈 가리기
+      } catch (e) {
+        debugPrint('eye mask: $e');
+      }
+    }
+    final old = _slotPhoto(p, k);
+    final other = _slotPhoto(p, k == 1 ? 2 : 1);
+    final np = await _makeSlotPhoto(data, k, p.consult);
+    if (!mounted) return;
+    np.recordId = p.recordId;
+    np.pair = other;
+    if (other != null) other.pair = np;
+    final i = old == null ? -1 : _patients.indexOf(old);
+    if (i >= 0) {
+      _patients[i] = np;
+    } else {
+      _patients.insert(math.max(0, _patients.indexOf(p) + 1), np);
+    }
+    // 원본 2(개구기) 쪽 미소 사진 = 원본 1 (미소 미리보기·정밀 매칭·참고 변환에 씀)
+    final s2 = k == 2 ? np : other;
+    if (s2 != null && k == 1) await setSmile(s2, data);
+    if (k == 2 && other != null && np.smile == null) {
+      await setSmile(np, other.beforeBytes);
+    }
+    if (!mounted) return;
+    if (identical(old, p)) {
+      _select(np); // 지금 보던 슬롯을 바꿨거나 예시 사진 화면이면 새 사진으로
+    } else {
+      setState(() {});
+    }
+    _smilePublish(_cur!);
+    _toast(
+      '${fromPc ? 'PC에서 ' : ''}원본 $k(${k == 1 ? '자연스러운 미소' : '개구기'}) 사진을 넣었습니다'
+      '${identical(_cur, np) ? '' : ' · 위 카드를 누르면 그 사진을 변환할 수 있어요'}',
+    );
+  }
+
+  /// 변환할 원본 고르기
+  Future<void> _slotSelect(PatientPhoto p, int k) async {
+    if (p.slot == k) return;
+    var t = _slotPhoto(p, k);
+    if (t == null && k == 1 && p.smile != null) {
+      // 미소 미리보기에 넣었던 미소 사진을 원본 1 로
+      t = await _makeSlotPhoto(p.smile!, 1, p.consult);
+      t.pair = p;
+      t.recordId = p.recordId;
+      p.pair = t;
+      _patients.insert(math.max(0, _patients.indexOf(p) + 1), t);
+    }
+    if (t == null || !mounted) return;
+    _select(t);
+  }
+
+  Future<void> _slotUpload(PatientPhoto p, int k) async {
+    final canCamera = _picker.supportsImageSource(ImageSource.camera);
+    final src = canCamera
+        ? await showModalBottomSheet<ImageSource>(
+            context: context,
+            showDragHandle: true,
+            backgroundColor: Colors.white,
+            constraints: const BoxConstraints(maxWidth: 480),
+            builder: (ctx) => SafeArea(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  ListTile(
+                    leading: const Icon(Icons.photo_camera_outlined),
+                    title: Text('원본 $k 촬영'),
+                    onTap: () => Navigator.pop(ctx, ImageSource.camera),
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.photo_library_outlined),
+                    title: const Text('갤러리에서 고르기'),
+                    onTap: () => Navigator.pop(ctx, ImageSource.gallery),
+                  ),
+                  const SizedBox(height: 8),
+                ],
+              ),
+            ),
+          )
+        : ImageSource.gallery;
+    if (src == null) return;
+    try {
+      final f = await _picker.pickImage(
+        source: src,
+        maxWidth: 2400,
+        maxHeight: 2400,
+        imageQuality: 92,
+      );
+      if (f == null) return;
+      await _setSlot(p, k, await f.readAsBytes());
+    } catch (e) {
+      _toast('사진을 불러오지 못했습니다. 카메라·사진 권한을 확인해 주세요.');
+    }
+  }
+
+  /// 2단계: 원본 1 + After → fal.ai 나노바나나 → Final Smile
+  Future<void> _finalSmile(PatientPhoto p) async {
+    final s1 = _slot1Bytes(p), after = _finalAfter(p);
+    if (_finalBusy) return;
+    if (s1 == null || after == null) {
+      _finalMsg = s1 == null
+          ? '원본 1(자연스러운 미소) 사진을 먼저 넣어 주세요'
+          : '먼저 1단계 변환으로 After를 만들어 주세요';
+      _toast(_finalMsg);
+      return;
+    }
+    setState(() {
+      _finalBusy = true;
+      _finalMsg = '✨ 2단계: 원본 1에 After 치열을 맞추는 중… (나노바나나)';
+    });
+    try {
+      final r = await (debugFinalSmile ?? makeFinalSmile)(
+        orig1: s1,
+        after: after,
+      );
+      if (!mounted) return;
+      if (!identical(p.smile, s1)) await setSmile(p, s1);
+      if (!mounted) return;
+      setState(() {
+        p.smileAfter = r.image;
+        p.smileFrom = 'Final Smile (2단계)';
+        p.addExtra(r.image, '✨ Final Smile', sub: 'After 치열 → 원본 1', pair: s1);
+        p.noteSmile();
+        _smileView = true;
+        _finalMsg = r.lipsLocked
+            ? '완성! 입술·얼굴은 원본 1 그대로 고정했습니다'
+            : '완성! (입술 자동 고정은 못 했어요 · 입술 모양을 확인해 주세요)';
+      });
+      _smilePublish(p);
+      _smileSave(p);
+      _toast('✨ Final Smile 완성 · ${_finalMsg.replaceFirst('완성! ', '')}');
+    } on PipelineError catch (e) {
+      _finalMsg = '⚠ ${e.message}';
+      _toast(_finalMsg);
+    } on AiError catch (e) {
+      _finalMsg = '⚠ ${e.message}';
+      _toast(_finalMsg);
+    } catch (e) {
+      _finalMsg = '⚠ 2단계를 만들지 못했습니다 ($e)';
+      _toast(_finalMsg);
+    } finally {
+      if (mounted) setState(() => _finalBusy = false);
+    }
+  }
+
+  Widget _slotBar(PatientPhoto p) {
+    final phone = MediaQuery.sizeOf(context).width < 600;
+    Widget card(int k) {
+      final b = k == 1 ? _slot1Bytes(p) : _slotPhoto(p, 2)?.beforeBytes;
+      final sel = p.slot == k;
+      final title = k == 1 ? '원본 1 · 자연스러운 미소' : '원본 2 · 개구기';
+      final hasAfter = (_slotPhoto(p, k)?.results.isNotEmpty ?? false);
+      return Expanded(
+        child: Material(
+          color: sel ? AppColors.blueSoft : Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+            side: BorderSide(
+              color: sel ? AppColors.blue : AppColors.gray200,
+              width: sel ? 2 : 1,
+            ),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: _converting || _finalBusy
+                ? null
+                : () => b == null ? _slotUpload(p, k) : _slotSelect(p, k),
+            child: Padding(
+              padding: const EdgeInsets.all(6),
+              child: Row(
+                children: [
+                  SizedBox(
+                    width: phone ? 54 : 72,
+                    height: phone ? 40 : 54,
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(6),
+                      child: b == null
+                          ? const ColoredBox(
+                              color: AppColors.gray100,
+                              child: Icon(
+                                Icons.add_a_photo_outlined,
+                                color: AppColors.gray500,
+                              ),
+                            )
+                          : Image.memory(
+                              b,
+                              fit: BoxFit.cover,
+                              cacheWidth: 160,
+                              gaplessPlayback: true,
+                            ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(
+                              sel
+                                  ? Icons.radio_button_checked
+                                  : Icons.radio_button_unchecked,
+                              size: 16,
+                              color: sel ? AppColors.blue : AppColors.gray500,
+                            ),
+                            const SizedBox(width: 4),
+                            Flexible(
+                              child: Text(
+                                title,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontSize: 12.5,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        Text(
+                          b == null
+                              ? '눌러서 사진 올리기'
+                              : sel
+                              ? '변환할 사진${hasAfter ? ' · After 있음' : ''}'
+                              : '눌러서 이 사진 변환${hasAfter ? ' · After 있음' : ''}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 11.5,
+                            color: AppColors.gray500,
+                          ),
+                        ),
+                        if (b != null)
+                          InkWell(
+                            onTap: _converting || _finalBusy
+                                ? null
+                                : () => _slotUpload(p, k),
+                            child: const Padding(
+                              padding: EdgeInsets.only(top: 2),
+                              child: Text(
+                                '사진 바꾸기',
+                                style: TextStyle(
+                                  fontSize: 11.5,
+                                  color: AppColors.blue,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    final go = FilledButton.icon(
+      style: FilledButton.styleFrom(minimumSize: const Size(0, 48)),
+      onPressed: _finalReady(p) ? () => _finalSmile(p) : null,
+      icon: _finalBusy
+          ? const SizedBox(
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: Colors.white,
+              ),
+            )
+          : const Icon(Icons.auto_awesome),
+      label: Text(_finalBusy ? '2단계 만드는 중…' : '2단계 · 최종 미소 만들기'),
+    );
+    final note = Text(
+      _finalMsg.isNotEmpty
+          ? _finalMsg
+          : _slot1Bytes(p) == null
+          ? '원본 1(미소)을 넣고 1단계 After를 만들면 2단계를 할 수 있어요'
+          : _finalAfter(p) == null
+          ? '1단계: 변환할 사진을 고르고 [After 변환하기] → 2단계: 원본 1에 After 치열 맞추기'
+          : '원본 1 + After 치열 → 입술·얼굴은 그대로, 치아만 바꿔요 (fal.ai 나노바나나)',
+      style: const TextStyle(fontSize: 11.5, color: AppColors.gray500),
+    );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(children: [card(1), const SizedBox(width: 8), card(2)]),
+        const SizedBox(height: 6),
+        if (phone) ...[
+          go,
+          const SizedBox(height: 4),
+          note,
+        ] else
+          Row(
+            children: [
+              Expanded(child: note),
+              const SizedBox(width: 8),
+              go,
+            ],
+          ),
+      ],
+    );
+  }
+
   // ── 😊 원본 2장 (개구기 사진 + 미소 사진) ─────────────────────────
   bool _smileRef = true; // 변환할 때 미소 사진도 참고
-  bool _autoMatch = true; // 변환 후 미소 사진에 자동 정밀 매칭
+  bool _autoMatch = false; // 변환 후 미소 사진에 자동 정밀 매칭 (기본 끔: 2단계 버튼이 대신함)
   bool _smileRefOn(PatientPhoto p) => _useAi && _smileRef && p.smile != null;
 
   Future<void> _matchAfterConvert(PatientPhoto p) async {

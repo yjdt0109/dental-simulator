@@ -88,6 +88,8 @@ void main() {
     send({'t': 'tx', 'v': '미백'});
     send({'t': 'shade', 'v': 'B1'});
     await t.pump();
+    send({'t': 'autoMatch', 'v': true}); // 기본은 꺼짐 (2단계 버튼이 대신)
+    await t.pump();
     send({'t': 'convert'}); // 원본 1: 개구기 사진 변환
     await _settle(
       t,
