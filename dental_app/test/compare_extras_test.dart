@@ -231,4 +231,32 @@ void main() {
     p.removePhoto(2, '2번');
     expect(p.baseIndex, 0); // 결과를 빼면 원본으로
   });
+
+  test('🦷 크기 조절 대상: 마지막으로 누른 사진 (원본·미소 원본 제외)', () {
+    final p = PatientPhoto(
+      id: 'r',
+      name: '',
+      type: '',
+      time: '',
+      beforeBytes: jpg(10),
+      imageSize: const Size(120, 90),
+    );
+    expect(p.resizeTarget(), isNull); // 원본뿐
+    final sm = jpg(20);
+    p.smile = sm;
+    final nSm = p.addExtra(sm, '😊 미소 1', sub: '미소 사진');
+    final fin = jpg(30);
+    final nFin = p.addExtra(fin, '✨ Final Smile', sub: 'After 치열 → 원본 1');
+    p.toggleSel(nSm);
+    expect(p.resizeTarget(), isNull); // 미소 원본은 대상 아님
+    p.sel = [nSm, nFin];
+    expect(p.resizeTarget(), nFin); // Final Smile 가능
+    p.addResult(jpg(40), 'k'); // After 1
+    p.sel = [nFin, 1];
+    expect(p.resizeTarget(), 1); // 마지막으로 누른 After
+    p.sel = [1, nFin];
+    expect(p.resizeTarget(), nFin);
+    p.sel = [0];
+    expect(p.resizeTarget(), 1); // 고른 게 없으면 마지막 After
+  });
 }

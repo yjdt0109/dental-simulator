@@ -710,18 +710,23 @@ img.Image scaleToothMasked(
   final ky = box.height / math.max(1e-6, ny1 - ny0);
   final mx = soft.width / src.width, my = soft.height / src.height;
   // ➖ 줄이기(음수): 원래 치아 자리를 먼저 치아 바깥 배경으로 채움
-  //   절단끝을 줄이면 → 치아 아래(입 안 어두운 곳·아래 치아)를 끌어올림
-  //   잇몸 쪽을 줄이면 → 위 잇몸을 끌어내림 / 옆을 줄이면 → 옆 사이 공간을 끌어옴
+  //   AI 치아 윤곽은 실제 치아보다 조금 작을 때가 많아 → 윤곽을 넉넉히 넓혀서(잔상 방지)
+  //   그 바깥에서 배경을 끌어옴: 절단끝 → 아래(입 안·아래 치아), 잇몸 쪽 → 위 잇몸, 옆 → 옆 공간
   if (left < 0 || right < 0 || up < 0 || down < 0) {
+    final mxH = box.height * 0.08 + 3, mxW = box.width * 0.08 + 3; // 넓히는 양(px)
+    final wide = img.gaussianBlur(
+      mask.numChannels == 1 ? mask.clone() : img.grayscale(mask.clone()),
+      radius: math.max(2, (mxH * 1.3 * mask.height / src.height).round()),
+    );
     final cx = box.center.dx, cy = box.center.dy;
-    final bx0 = math.max(0, (box.left - 3).floor()),
-        bx1 = math.min(src.width - 1, (box.right + 3).ceil());
-    final by0 = math.max(0, (box.top - 3).floor()),
-        by1 = math.min(src.height - 1, (box.bottom + 3).ceil());
+    final bx0 = math.max(0, (box.left - mxW).floor()),
+        bx1 = math.min(src.width - 1, (box.right + mxW).ceil());
+    final by0 = math.max(0, (box.top - mxH).floor()),
+        by1 = math.min(src.height - 1, (box.bottom + mxH).ceil());
     for (var y = by0; y <= by1; y++) {
       for (var x = bx0; x <= bx1; x++) {
-        final a0 =
-            soft
+        final w0 =
+            wide
                 .getPixelInterpolate(
                   x * mx,
                   y * my,
@@ -729,16 +734,18 @@ img.Image scaleToothMasked(
                 )
                 .r /
             255.0;
-        if (a0 <= 0.01) continue;
+        if (w0 <= 0.02) continue;
+        // 넓힌 윤곽 안은 확실히 덮고(가장자리만 살짝 부드럽게)
+        final a0 = math.min(1.0, w0 * 6);
         double fx = x.toDouble(), fy = y.toDouble();
         if (down < 0 && y >= cy) {
-          fy = y - down + 2; // 아래 배경 (입 안·아래 치아)을 끌어올림
+          fy = y - down + mxH; // 줄인 만큼 + 넓힌 만큼 아래에서
         } else if (up < 0 && y < cy) {
-          fy = y + up - 2; // 위 잇몸을 끌어내림
+          fy = y + up - mxH;
         } else if (left < 0 && x < cx) {
-          fx = x + left - 2;
+          fx = x + left - mxW;
         } else if (right < 0 && x >= cx) {
-          fx = x - right + 2;
+          fx = x - right + mxW;
         } else {
           continue;
         }

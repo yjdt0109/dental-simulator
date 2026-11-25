@@ -37,6 +37,37 @@ void main() {
     expect(out.getPixel(10, 10).r, 30); // 바깥은 그대로
   });
 
+  test('➖ 줄이기 잔상 없음: AI 윤곽이 실제 치아보다 작아도 원래 절단끝 자국이 안 남음', () {
+    final src = img.Image(width: 120, height: 160)
+      ..clear(img.ColorRgb8(30, 20, 20));
+    img.fillRect(
+      src,
+      x1: 40,
+      y1: 20,
+      x2: 80,
+      y2: 100,
+      color: img.ColorRgb8(240, 240, 230),
+    );
+    // 윤곽(마스크)이 실제 치아보다 3px 작음
+    final mask = img.Image(width: 120, height: 160, numChannels: 1);
+    img.fillRect(
+      mask,
+      x1: 43,
+      y1: 23,
+      x2: 77,
+      y2: 97,
+      color: img.ColorRgb8(255, 255, 255),
+    );
+    final box = const Rect.fromLTRB(43, 23, 78, 98);
+    final out = scaleToothMasked(src, mask, box, down: -20);
+    for (final y in [90, 95, 98, 100]) {
+      for (final x in [45, 60, 75]) {
+        expect(out.getPixel(x, y).r, lessThan(90), reason: '($x,$y) 잔상');
+      }
+    }
+    expect(out.getPixel(60, 50).r, greaterThan(220));
+  });
+
   test('크기 조절 세션: 줄이기 −30% 까지 허용', () {
     final s = ResizeSession(
       image: Uint8List(0),

@@ -282,6 +282,33 @@ class PatientPhoto {
     }
   }
 
+  /// 🦷 크기 조절할 사진: 목록에서 마지막으로 누른 사진 (원본·원본 1(미소)·미소 원본 제외).
+  /// After(결과)·미소 미리보기·Final Smile·불러온 사진 모두 가능. 없으면 null
+  int? resizeTarget({Uint8List? orig1, bool smileView = false}) {
+    bool ok(int n) {
+      if (n == 0) return false;
+      if (n > 0) return n <= results.length;
+      if (-n > extras.length) return false;
+      final e = extras[-n - 1];
+      return !(identical(e.bytes, orig1) ||
+          identical(e.bytes, beforeBytes) ||
+          identical(e.bytes, smile) ||
+          e.sub == '미소 사진');
+    }
+
+    final cmp = compare;
+    for (final n in sel.reversed) {
+      if (ok(n) && cmp.contains(n)) return n;
+    }
+    if (smileView && smileAfter != null) {
+      final i = extras.indexWhere((e) => identical(e.bytes, smileAfter));
+      if (i >= 0) return -(i + 1);
+    }
+    final last = cmp.where(ok).lastOrNull;
+    if (last != null) return last;
+    return results.isEmpty ? null : results.length;
+  }
+
   /// 같은 내용의 사진이 이미 목록(원본·결과·불러온 사진)에 있는지
   bool hasPhoto(Uint8List b) {
     bool same(Uint8List a) =>

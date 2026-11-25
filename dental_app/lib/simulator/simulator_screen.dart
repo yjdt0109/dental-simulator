@@ -221,6 +221,11 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
       'redo': p.future.isEmpty ? null : p.future.last.label,
       'notice': _noticeAt == 0 ? null : {'m': _notice, 'at': _noticeAt},
       'base': p.baseIndex == 0 ? '' : _label(p, p.baseIndex),
+      'rzOk': _mode != _ViewMode.edit && _rzTargetOf(p) != null,
+      'rzOf': (() {
+        final n = _rzTargetOf(p);
+        return n == null ? '' : _label(p, n);
+      })(),
       'slots': {
         'cur': p.slot,
         's1': _slot1Bytes(p) != null,
@@ -2321,7 +2326,8 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
               style: const TextStyle(fontSize: 12, color: AppColors.gray500),
             ),
           if (!_briefing && _useAi) _guideCheck(p),
-          if (mode != _ViewMode.edit && _converted) _resultTools(p),
+          if (mode != _ViewMode.edit && (_converted || _rzTargetOf(p) != null))
+            _resultTools(p),
         ],
       ),
     );
@@ -2362,7 +2368,8 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
 
   Widget _resultTools(PatientPhoto p) {
     final hasContour = _contourLines(p).isNotEmpty;
-    final canResize = !_briefing && _useAi && _c.doneAt == null;
+    final canResize =
+        !_briefing && _useAi && _c.doneAt == null && _rzTargetOf(p) != null;
     final hasSmile = p.smileAfter != null && p.smile != null;
     if (!hasContour && !canResize && !hasSmile) return const SizedBox.shrink();
     return Padding(
@@ -2397,18 +2404,24 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
   ResizeSession? _rz;
   int _rzVer = 0;
 
+  int _rzN = 0; // PC 크기 조절 중인 사진 번호
+
   void _rzStart(PatientPhoto p) {
-    final after = _shownAfter(p);
-    if (after == null || _c.doneAt != null) return;
+    final n = _rzTargetOf(p);
+    if (n == null || _c.doneAt != null) return;
+    _rzN = n;
     setState(
       () => _rz = ResizeSession(
-        image: after,
+        image: p.bytesOf(n),
         noPrep: _c.tx.contains(kNoPrep),
         chartTeeth: sortTeeth(_c.teeth),
-        teeth: [
-          for (final t in p.sam) (label: t.label, box: t.box, upper: t.upper),
-        ],
-        masks: [for (final t in p.sam) t.mask],
+        teeth: n > 0
+            ? [
+                for (final t in p.sam)
+                  (label: t.label, box: t.box, upper: t.upper),
+              ]
+            : const [],
+        masks: n > 0 ? [for (final t in p.sam) t.mask] : const [],
       ),
     );
     _rzPreview();
@@ -2441,13 +2454,13 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
     setState(() => rz.busy = true);
     final out = await rz.apply();
     if (!mounted) return;
+    final n = _rzN;
     setState(() {
       _rz = null;
-      p.remember('치아 크기 조절');
-      p.addResult(out, _settingsKey(), engine: '크기조절');
+      _rzAddResult(p, n, out);
     });
     CastService.instance.put('rzImg', null);
-    _toast('🦷 PC에서 조절한 치아 크기를 ${p.results.length}번으로 추가했습니다.');
+    _toast(_rzDoneMsg(p, n));
   }
 
   void _rzEnd() {
@@ -2805,30 +2818,67 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
     _smileSave(p);
   }
 
+  /// 🦷 크기 조절할 사진: 왼쪽 목록에서 마지막으로 누른 사진 (원본 1·2 는 제외)
+  ///   After(변환 결과)·미소 미리보기·Final Smile·불러온 사진 모두 가능
+  int? _rzTargetOf(PatientPhoto p) =>
+      p.resizeTarget(orig1: _slot1Bytes(p), smileView: _smileView);
+
+  /// 크기 조절 결과 넣기: After 였으면 새 After, 다른 사진이면 그 옆에 새 사진
+  void _rzAddResult(PatientPhoto p, int n, Uint8List out) {
+    if (n > 0) {
+      p.remember('치아 크기 조절');
+      p.addResult(out, _settingsKey(), engine: '크기조절');
+      return;
+    }
+    final e = p.extras[-n - 1];
+    final k = p.addExtra(
+      out,
+      '${e.label} · 크기조절',
+      sub: '크기 조절',
+      pair: e.pair ?? e.bytes,
+    );
+    p.sel = [n, k];
+    p.editing = false;
+    _smileView = false;
+  }
+
+  String _rzDoneMsg(PatientPhoto p, int n) => n > 0
+      ? '🦷 치아 크기를 조절한 결과를 ${_label(p, p.results.length)}(으)로 추가했습니다.'
+      : '🦷 치아 크기를 조절한 사진을 왼쪽 목록에 추가했습니다.';
+
   Future<void> _openResize(PatientPhoto p) async {
-    final after = _shownAfter(p);
-    if (after == null) return;
+    final n = _rzTargetOf(p);
+    if (n == null) return;
+    final image = p.bytesOf(n);
+    var size = p.imageSize;
+    if (n < 0) {
+      final im = await decodeImageFromList(image);
+      size = Size(im.width.toDouble(), im.height.toDouble());
+      im.dispose();
+    }
+    if (!mounted) return;
     final out = await Navigator.of(context).push<Uint8List>(
       MaterialPageRoute(
         builder: (_) => ToothResizeScreen(
-          image: after,
-          imageSize: p.imageSize,
-          teeth: [
-            for (final t in p.sam) (label: t.label, box: t.box, upper: t.upper),
-          ],
+          image: image,
+          imageSize: size,
+          // 같은 촬영(After)이면 고른 치아 윤곽을 그대로, 다른 사진이면 새로 탭해서 고름
+          teeth: n > 0
+              ? [
+                  for (final t in p.sam)
+                    (label: t.label, box: t.box, upper: t.upper),
+                ]
+              : const [],
           noPrep: _c.tx.contains(kNoPrep),
           falKey: PipelineSettings.instance.falKey,
           chartTeeth: sortTeeth(_c.teeth),
-          masks: [for (final t in p.sam) t.mask],
+          masks: n > 0 ? [for (final t in p.sam) t.mask] : const [],
         ),
       ),
     );
     if (out == null || !mounted) return;
-    setState(() {
-      p.remember('치아 크기 조절');
-      p.addResult(out, _settingsKey(), engine: '크기조절');
-    });
-    _toast('🦷 치아 크기를 조절한 결과를 ${p.results.length}번으로 추가했습니다.');
+    setState(() => _rzAddResult(p, n, out));
+    _toast(_rzDoneMsg(p, n));
   }
 
   /// 사진 아래: 서비컬 라인 그리기 사용 체크
