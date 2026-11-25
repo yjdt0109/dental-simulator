@@ -321,6 +321,89 @@ img.Image editRegion(img.Image union, List<ToothSel> sels, {double grow = 0}) {
   return out;
 }
 
+/// ③ 마진 고정형 변환 영역: 고른 치아의 **잇몸 쪽 경계(서비컬)만 고정**하고
+/// 절단 쪽으로 [incisal](치아 길이 대비)만큼, 옆에 고른 치아가 있으면 그쪽 틈까지 [lateral] 만큼 넓게 열어 줌.
+/// → 마진은 그대로, 치아 길이·폭·깨진 절단끝·벌어진 틈은 새로 만들 수 있음
+img.Image marginLockedRegion(
+  img.Image union,
+  List<ToothSel> sels, {
+  double incisal = 0.25,
+  double lateral = 0.15,
+}) {
+  final out = union.clone();
+  final w = union.width, h = union.height;
+  for (final s in sels) {
+    final m = s.mask;
+    final bx0 = math.max(0, (s.box.left * w).floor());
+    final bx1 = math.min(w - 1, (s.box.right * w).ceil());
+    // 열마다 잇몸 쪽 끝(cerv)과 절단 쪽 끝(edge)
+    final cerv = <int, int>{}, edge = <int, int>{};
+    for (var x = bx0; x <= bx1; x++) {
+      int? top, bot;
+      for (var y = 0; y < h; y++) {
+        if (m.getPixel(x, y).r > 127) {
+          top ??= y;
+          bot = y;
+        }
+      }
+      if (top == null || bot == null) continue;
+      cerv[x] = s.upper ? top : bot;
+      edge[x] = s.upper ? bot : top;
+    }
+    if (cerv.isEmpty) continue;
+    final cols = cerv.keys.toList()..sort();
+    final first = cols.first, last = cols.last;
+    final crownPx = math.max(
+      ((s.incisal.dy - s.zenith.dy).abs() * h),
+      (s.box.height * h * 0.6),
+    );
+    final ext = (crownPx * incisal).round();
+    // 절단 쪽 한계: 이 치아에서 가장 긴 곳 + ext (들쭉날쭉한 절단끝도 고르게 채울 수 있게)
+    final limit = s.upper
+        ? edge.values.reduce(math.max) + ext
+        : edge.values.reduce(math.min) - ext;
+    // 옆에 같은 턱의 고른 치아가 있으면 그쪽으로 틈까지 열기, 없으면 아주 조금만
+    final tw = (last - first + 1).toDouble();
+    bool neighbor(int dir) => sels.any(
+      (o) =>
+          !identical(o, s) &&
+          o.upper == s.upper &&
+          (dir < 0
+              ? o.box.center.dx < s.box.center.dx
+              : o.box.center.dx > s.box.center.dx) &&
+          (o.box.center.dx - s.box.center.dx).abs() * w < tw * 2.2,
+    );
+    final wl = (tw * (neighbor(-1) ? lateral : 0.03)).round();
+    final wr = (tw * (neighbor(1) ? lateral : 0.03)).round();
+    for (
+      var x = math.max(0, first - wl);
+      x <= math.min(w - 1, last + wr);
+      x++
+    ) {
+      // 넓힌 옆 칸은 가장 가까운 치아 열의 잇몸 높이를 씀 (잇몸 꼭지는 그대로)
+      final kx = x < first ? first : (x > last ? last : x);
+      var c = cerv[kx];
+      if (c == null) {
+        // 윤곽 중간에 빈 열이 있으면 가까운 열에서
+        for (var d = 1; d < cols.length && c == null; d++) {
+          c = cerv[kx - d] ?? cerv[kx + d];
+        }
+      }
+      if (c == null) continue;
+      if (s.upper) {
+        for (var y = c; y <= math.min(h - 1, limit); y++) {
+          out.setPixelR(x, y, 255);
+        }
+      } else {
+        for (var y = math.max(0, limit); y <= c; y++) {
+          out.setPixelR(x, y, 255);
+        }
+      }
+    }
+  }
+  return out;
+}
+
 /// 사진 위에 깔 반투명 하이라이트 (민트) — 경계는 진하게
 Uint8List overlayPng(img.Image union, {int maxSide = 900}) {
   var m = union;

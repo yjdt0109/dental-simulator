@@ -8,6 +8,9 @@ import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:image/image.dart' as img;
+
+import 'align_fix.dart';
+
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../simulator/sim_models.dart' show GuideLine, MaskStroke;
@@ -444,12 +447,14 @@ Uint8List _fullResult((img.Image, Uint8List, List<GuideLine>) a) {
       );
     }
   }
-  final out = img.copyResize(
+  var out = img.copyResize(
     ai,
     width: src.width,
     height: src.height,
     interpolation: img.Interpolation.cubic,
   );
+  // ② AI 가 사진을 밀거나 키웠으면 원본에 맞게 되돌림 (잇몸선·경계가 어긋나지 않게)
+  out = alignAiToSource(src, out).image;
   for (final l in lock) {
     _lockGum(src, out, l);
   }

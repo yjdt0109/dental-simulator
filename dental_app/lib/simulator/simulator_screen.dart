@@ -652,8 +652,14 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
   img.Image? _samRegion(PatientPhoto p, Consult c) {
     final u = p.samUnion;
     if (u == null || !p.hasSam) return null;
-    const longer = {'라미네이트', '무삭제 라미네이트', '올세라믹 크라운', '임플란트'};
-    return editRegion(u, p.sam, grow: c.tx.any(longer.contains) ? 0.10 : 0);
+    // ③ 모양·길이를 바꾸는 치료: 잇몸 쪽 경계만 고정, 절단·옆은 넓게 열기 (치아가 옛 틀에 갇히지 않게)
+    const reshape = {'라미네이트', '올세라믹 크라운', '임플란트', '교정'};
+    if (c.tx.any(reshape.contains)) return marginLockedRegion(u, p.sam);
+    // 무삭제 라미네이트: 깎지 않으니 절단 쪽만 조금 (길게만)
+    if (c.tx.contains('무삭제 라미네이트')) {
+      return editRegion(u, p.sam, grow: 0.10);
+    }
+    return u; // 미백 등: 치아 모양 그대로
   }
 
   /// 🦷 절단선 자동 찾기 (서비컬 라인 기준) → 기존 절단선은 바꿈
