@@ -11,6 +11,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../simulator/sim_models.dart' show GuideLine;
 import 'ai_service.dart';
+import 'final_smile.dart' show FalNanoBananaEdit;
 
 // =============================================================================
 // 2단계(Two-Pass) 하이브리드 파이프라인
@@ -579,6 +580,89 @@ class TwoPassPipeline {
   TwoPassPipeline({this.client});
   final http.Client? client; // 테스트에서 가짜 서버를 넣을 때
 
+  /// 나노바나나 Pro 후보 이름 (설정한 이름이 '모델 없음'이면 차례로 시험)
+  static const proCandidates = [
+    'gemini-3-pro-image',
+    'gemini-3-pro-image-preview',
+    'gemini-3.1-pro-image',
+  ];
+
+  /// Firebase 에 Pro 모델이 없으면 true → 바로 fal.ai 나노바나나 Pro 로
+  static bool proViaFal = false;
+  static String? proActive; // 연결 확인된 Pro 모델 이름
+
+  /// 테스트용 바꿔 끼우기
+  static Future<Uint8List> Function(
+    String model,
+    String prompt,
+    Uint8List jpeg,
+    List<({String label, Uint8List jpeg})> refs,
+  )?
+  debugGemini;
+  static Future<Uint8List> Function(List<Uint8List> jpegs, String prompt)?
+  debugFalPro;
+
+  static bool _missing(Object e) {
+    final t = '$e';
+    return t.contains('not found') ||
+        t.contains('NOT_FOUND') ||
+        t.contains('does not have access') ||
+        t.contains('Publisher model') ||
+        t.contains('모델을 쓸 수 없습니다');
+  }
+
+  /// 옵션 B 마무리: Firebase 나노바나나 Pro → 모델이 없으면 다른 이름 → 그래도 없으면 fal.ai 나노바나나 Pro
+  Future<Uint8List> proFinish(
+    PipelineSettings s,
+    Uint8List jpeg,
+    String prompt,
+    List<({String label, Uint8List jpeg})> refs,
+  ) async {
+    if (!proViaFal) {
+      final names = <String>[
+        if (proActive != null) proActive!,
+        s.nanoProModel,
+        ...proCandidates,
+      ].toSet().toList();
+      Object? last;
+      for (final m in names) {
+        try {
+          final r = debugGemini != null
+              ? await debugGemini!(m, prompt, jpeg, refs)
+              : await AiService.instance.geminiImage(
+                  model: m,
+                  prompt: prompt,
+                  jpeg: jpeg,
+                  extra: refs,
+                );
+          proActive = m;
+          return r;
+        } catch (e) {
+          if (!_missing(e)) rethrow; // 모델 문제가 아니면 그대로 알림
+          last = e;
+        }
+      }
+      debugPrint('나노바나나 Pro 모델 없음 → fal.ai 로: $last');
+      proViaFal = true;
+    }
+    if (!s.hasFal && debugFalPro == null) {
+      throw const PipelineError(
+        '나노바나나 Pro 를 쓸 수 없어 Fal.ai 로 바꾸려 했지만 Fal.ai 키가 없습니다.',
+      );
+    }
+    final jpegs = [jpeg, for (final r in refs) r.jpeg];
+    final p = refs.isEmpty
+        ? prompt
+        : '$prompt\nThe first image is the photo to edit; the other images are reference only.';
+    return debugFalPro != null
+        ? debugFalPro!(jpegs, p)
+        : FalNanoBananaEdit(
+            s.falKey!,
+            client: client,
+            pro: true,
+          ).edit(jpegs: jpegs, prompt: p);
+  }
+
   /// [fluxPrompt]: 치료별 임상 지시 (1단계용), [lock]: 잇몸 원본 픽셀 고정에 쓸 선.
   /// 1단계가 실패하면 PipelineError, 2단계가 실패하면 1단계 결과 + [onNotice] 안내.
   Future<Uint8List> run({
@@ -638,13 +722,11 @@ class TwoPassPipeline {
           jpeg: p1Jpeg,
           extra: refs,
         ),
-        Engine.b => await AiService.instance.geminiImage(
-          model: s.nanoProModel,
-          prompt: refPrompt.isEmpty
-              ? kFinishPrompt
-              : '$kFinishPrompt\n$refPrompt',
-          jpeg: p1Jpeg,
-          extra: refs,
+        Engine.b => await proFinish(
+          s,
+          p1Jpeg,
+          refPrompt.isEmpty ? kFinishPrompt : '$kFinishPrompt\n$refPrompt',
+          refs,
         ),
         Engine.c => await _vertex(
           s,
