@@ -210,4 +210,51 @@ void main() {
       expect(t.takeException(), isNull);
     });
   }
+
+  testWidgets('미소 미리보기: 오늘 만든 After 중 골라 2번(보철 사진)으로', (t) async {
+    t.view.physicalSize = const Size(1280, 900);
+    t.view.devicePixelRatio = 1;
+    addTearDown(t.view.reset);
+    final smile = Uint8List.fromList(img.encodeJpg(smileImg()));
+    final p = PatientPhoto(
+      id: 'y',
+      name: '김',
+      type: '정면',
+      time: '방금',
+      beforeBytes: smile,
+      imageSize: const Size(400, 300),
+    );
+    await t.runAsync(() => setSmile(p, smile));
+    final a1 = Uint8List.fromList(
+      img.encodeJpg(
+        img.Image(width: 40, height: 30)..clear(img.ColorRgb8(250, 250, 245)),
+      ),
+    );
+    final a2 = Uint8List.fromList(
+      img.encodeJpg(
+        img.Image(width: 40, height: 30)..clear(img.ColorRgb8(240, 240, 235)),
+      ),
+    );
+    await t.pumpWidget(
+      MaterialApp(
+        theme: buildTheme(),
+        home: SmilePreviewScreen(
+          photo: p,
+          afterChoices: [
+            (label: '김 After 1', bytes: a1),
+            (label: '김 After 1 (원본 2)', bytes: a2),
+          ],
+        ),
+      ),
+    );
+    await t.scrollUntilVisible(
+      find.text('오늘 만든 After에서 고르기'),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await t.tap(find.text('김 After 1 (원본 2)'));
+    await t.pump();
+    expect(find.text('2번: 김 After 1 (원본 2)'), findsOneWidget);
+    expect(t.takeException(), isNull);
+  });
 }

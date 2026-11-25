@@ -279,6 +279,9 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
           'step': _mFor == p.id ? _mStep : '',
           'made': _mFor == p.id && _mRes != null,
           'pick': _mPick,
+          'afters': [
+            for (final a in _afterChoices(p)) {'k': a.key, 'l': a.label},
+          ],
         },
       },
       'lineUndo': p.lineHistory.isNotEmpty,
@@ -1298,6 +1301,9 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
               p.compare.where((i) => i > 0).lastOrNull ?? p.results.length;
           _matchSet(p, a, _label(p, n));
         }
+      case 'matchUseResult': // PC: 오늘 만든 After 중 하나를 2번(보철 사진)으로
+        final a = _afterChoices(p).where((x) => x.key == '$v').firstOrNull;
+        if (a != null) _matchSet(p, a.bytes, a.label);
       case 'matchRun':
         _matchRun(p);
       case 'matchPick':
@@ -2506,6 +2512,11 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
         'after': await jpegBase64(p.smileAfter!, maxSide: 1280),
       if (_mFor == p.id && _mProsth != null)
         'p2': await jpegBase64(_mProsth!, maxSide: 480, quality: 75),
+      // 오늘 만든 After 작은 사진 (PC 정밀 매칭에서 고르기)
+      'aft': {
+        for (final a in _afterChoices(p))
+          a.key: await jpegBase64(a.bytes, maxSide: 200, quality: 65),
+      },
       if (_mFor == p.id && _mRes != null) ...{
         'm1': await jpegBase64(_mRes!.composite, maxSide: 1280),
         'm2': await jpegBase64(_mRes!.stage1, maxSide: 1280),
@@ -2808,6 +2819,9 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
           photo: p,
           after: after,
           afterLabel: after == null ? '' : _label(p, n),
+          afterChoices: [
+            for (final a in _afterChoices(p)) (label: a.label, bytes: a.bytes),
+          ],
         ),
       ),
     );
@@ -3963,6 +3977,33 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
 
   bool _finalReady(PatientPhoto p) =>
       _slot1Bytes(p) != null && _finalAfter(p) != null && !_finalBusy;
+
+  /// 오늘 만든 After 목록: 이 사진·짝 사진(원본 1·2)의 변환 결과 + 크기조절·After 가 붙은 사진
+  List<({String key, String label, Uint8List bytes})> _afterChoices(
+    PatientPhoto p,
+  ) {
+    final out = <({String key, String label, Uint8List bytes})>[];
+    void addAll(PatientPhoto q, String pre) {
+      for (var n = 1; n <= q.results.length; n++) {
+        out.add((
+          key: '$pre$n',
+          label: pre == 'q' ? '${_label(q, n)} (원본 ${q.slot})' : _label(q, n),
+          bytes: q.results[n - 1].bytes,
+        ));
+      }
+    }
+
+    addAll(p, 'p');
+    final q = p.pair;
+    if (q != null) addAll(q, 'q');
+    for (var i = 0; i < p.extras.length; i++) {
+      final e = p.extras[i];
+      if (e.sub == '크기 조절' || e.label.contains('After')) {
+        out.add((key: 'e$i', label: e.label, bytes: e.bytes));
+      }
+    }
+    return out;
+  }
 
   bool _finalBusy = false;
   String? _slotImgKey;

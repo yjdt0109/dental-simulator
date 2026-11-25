@@ -21,6 +21,7 @@ class SmilePreviewScreen extends StatefulWidget {
     this.afterLabel = '',
     this.pick,
     this.pickRecords,
+    this.afterChoices = const [],
     this.make,
     this.matcher,
   });
@@ -31,6 +32,9 @@ class SmilePreviewScreen extends StatefulWidget {
   /// 시험용
   final Future<Uint8List?> Function(ImageSource src)? pick;
   final Future<List<PickedPhoto>?> Function()? pickRecords;
+
+  /// 오늘 만든 After 들 (보철 사진 정밀 매칭의 2번으로 고르기)
+  final List<({String label, Uint8List bytes})> afterChoices;
   final Future<Uint8List> Function(
     Uint8List smile,
     Uint8List after,
@@ -246,6 +250,69 @@ class _SmilePreviewScreenState extends State<SmilePreviewScreen> {
                 ),
               ],
             ),
+            if (widget.afterChoices.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              const Text(
+                '오늘 만든 After에서 고르기',
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: 4),
+              SizedBox(
+                height: 86,
+                child: ListView(
+                  scrollDirection: Axis.horizontal,
+                  children: [
+                    for (final a in widget.afterChoices)
+                      Padding(
+                        padding: const EdgeInsets.only(right: 6),
+                        child: InkWell(
+                          onTap: _matching
+                              ? null
+                              : () => setState(() {
+                                  _prosth = a.bytes;
+                                  _prosthLabel = a.label;
+                                  _match = null;
+                                }),
+                          child: Container(
+                            width: 96,
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: identical(_prosth, a.bytes)
+                                    ? AppColors.blue
+                                    : AppColors.gray200,
+                                width: identical(_prosth, a.bytes) ? 2 : 1,
+                              ),
+                            ),
+                            padding: const EdgeInsets.all(3),
+                            child: Column(
+                              children: [
+                                Expanded(
+                                  child: ClipRRect(
+                                    borderRadius: BorderRadius.circular(5),
+                                    child: Image.memory(
+                                      a.bytes,
+                                      fit: BoxFit.cover,
+                                      width: double.infinity,
+                                      cacheWidth: 200,
+                                    ),
+                                  ),
+                                ),
+                                Text(
+                                  a.label,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(fontSize: 10.5),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ],
             if (_prosthLabel.isNotEmpty) ...[
               const SizedBox(height: 4),
               Text(
