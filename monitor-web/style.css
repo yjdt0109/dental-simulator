@@ -424,3 +424,9 @@ table.rank td { padding: 8px; border-top: 1px solid var(--line); }
 .slot-final small { font-size: 11.5px; color: var(--muted); }
 @media (max-width: 900px) { .slotbar { grid-template-columns: 1fr 1fr; } .slot-final { grid-column: 1 / -1; max-width: none; } }
 .slotbar { flex: none; margin-bottom: 0; }
+
+/* v3.36 */
+.sm-open { left: 154px; flex-wrap: wrap; }
+.sm-open .rz-open { position: static; box-shadow: 0 4px 14px rgba(0, 0, 0, .25); }
+.save-btn { width: 100%; margin-top: 8px; min-height: 46px; font-weight: 800; border: 2px solid var(--blue); color: var(--blue-deep); background: #fff; }
+.save-btn:disabled { opacity: .5; }

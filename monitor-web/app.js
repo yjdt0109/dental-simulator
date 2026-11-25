@@ -109,7 +109,7 @@ function render() {
   const tabletView = state.view || 'edit';
   if (tabletView !== lastTabletView) { lastTabletView = tabletView; localView = null; }
   const items = Array.isArray(state.items) ? state.items.map(String) : ['원본'];
-  const subs = Array.isArray(state.subs) ? state.subs.map(String) : []; // 태블릿 2026.11.25-a 이상: 불러온 사진 설명
+  const subs = Array.isArray(state.subs) ? state.subs.map(String) : []; // 태블릿 2026.11.25-b 이상: 불러온 사진 설명
   const cmp = Array.isArray(state.cmp) ? state.cmp.filter((n) => Number.isInteger(n) && n < items.length) : [0];
   const hasAfterShown = tabletView !== 'edit' && images && images.after;
   // one: 비교 목록에서 1장만 고름 → 그 사진만 크게
@@ -150,8 +150,10 @@ function render() {
   $('#loadingText').textContent = busy ? (state.convertMsg || 'After를 만드는 중…') : '사진을 불러오는 중…';
 
   // 서비컬 라인 (AI 사용 + 변환 전 화면)
+  // 서비컬 라인·🪄 치아 고르기 체크 칸은 늘 보임 (체크하면 태블릿이 원본 화면으로)
   const guideOk = view === 'edit' && state.useAi;
-  $('#guideCheck').hidden = !guideOk;
+  const guideShow = !!state.useAi && !state.briefing;
+  $('#guideCheck').hidden = !guideShow;
   $('#drawLines').checked = !!state.drawLines;
   $('#drawLines').disabled = locked();
   const drawing = guideOk && state.drawLines && !locked();
@@ -171,7 +173,7 @@ function render() {
   if (!noPrep && tool === 'incisal') setTool('upper');
   // 🪄 자동 선택 (태블릿에 Fal.ai 키가 있을 때)
   const samShow = guideOk && !!state.samOn && !locked();
-  $('#samCheck').hidden = !samShow;
+  $('#samCheck').hidden = !(guideShow && !!state.samOn && !locked());
   $('#samTools').hidden = !samShow || !$('#samOnChk').checked;
   if ((!samShow || !$('#samOnChk').checked) && samMode) setSamMode(false);
   $('#samUndo').disabled = !state.samUndo;
@@ -315,7 +317,15 @@ function renderPanel(teeth, tx, view) {
   cb.classList.toggle('busy', busy);
   $('#convertBase').textContent = state.base ? `🔁 기준 사진: ${state.base} → 이 결과를 다듬어요 (원본으로 하려면 비교 목록에서 원본 클릭)` : '기준 사진: 원본 · 브리핑 비교 목록에서 변환 결과를 클릭하면 그 결과를 기준으로 다시 변환해요';
   $('#convertBase').classList.toggle('on', !!state.base);
-  // 😊 원본 2장 (태블릿 2026.11.25-a 이상)
+  // 💾 저장 버튼 · PC 폴더 저장 상태
+  $('#saveBtn').disabled = !state.hasAfter || locked() || !!state.converting;
+  $('#saveBtn').textContent = locked() ? '✓ 저장·상담 완료됨' : '💾 저장 및 상담 완료';
+  if (!/저장하는 중/.test($('#saveNote').textContent) || locked()) {
+    $('#saveNote').innerHTML = locked() ? '환자 기록에 저장됐어요' + (pcDirState === 'on' ? ` · 💾 PC 폴더(${esc(pcDir.name)})에도 저장` : '')
+      : pcDirState === 'on' ? `💾 저장하면 PC 폴더(${esc(pcDir.name)})에도 자동 저장돼요`
+        : '⚠ PC 폴더 저장이 꺼져 있어요 · <a href="#" id="savePick">📁 PC 저장 폴더 고르기</a>';
+  }
+  // 😊 원본 2장 (태블릿 2026.11.25-b 이상)
   const sr = state.smileRef;
   $('#smRef').hidden = !sr || locked();
   if (sr) {
@@ -364,6 +374,17 @@ const pendingFlush = [];
   $('#smRefOn').addEventListener('change', (e) => cmd('smileRef', e.target.checked));
   $('#smRefAuto').addEventListener('change', (e) => cmd('autoMatch', e.target.checked));
   $('#smRefAdd').addEventListener('click', () => $('#smOpen').click());
+  // 💾 저장 및 상담 완료 (PC 에서도) → 태블릿이 환자 기록에 저장 → PC 폴더 자동 저장
+  $('#saveBtn').addEventListener('click', () => {
+    if (!state) return;
+    const who = (state.name || '').trim();
+    if (!who) { $('#saveNote').textContent = '⚠ 환자 이름을 먼저 입력해 주세요'; return; }
+    const pc = pcDirState === 'on' ? `\n💾 PC 폴더(${pcDir.name})에도 자동 저장됩니다.` : '\n⚠ PC 폴더 저장이 꺼져 있어요 (태블릿에만 저장).';
+    if (!confirm(`${who} 님 시뮬레이션 결과를 저장하고 상담을 완료할까요?${pc}`)) return;
+    pendingFlush.forEach((f) => f());
+    cmd('confirmSave');
+    $('#saveNote').textContent = '💾 저장하는 중…';
+  });
   $('#convertBtn').addEventListener('click', () => { pendingFlush.forEach((f) => f()); cmd('convert'); });
   $('#undoBtn').addEventListener('click', () => cmd('undo'));
   $('#redoBtn').addEventListener('click', () => cmd('redo'));
@@ -377,7 +398,10 @@ const pendingFlush = [];
   });
   $('#drawLines').addEventListener('change', (e) => cmd('drawLines', e.target.checked));
   // 🪄 체크하면 아래에 자동 선택 도구 + 바로 치아 클릭 모드
-  $('#samOnChk').addEventListener('change', (e) => { setSamMode(e.target.checked); render(); });
+  $('#samOnChk').addEventListener('change', (e) => {
+    if (e.target.checked && state && state.view !== 'edit') cmd('before'); // 원본 화면으로
+    setSamMode(e.target.checked); render();
+  });
 
   // 글자 입력: 잠깐 멈추면 태블릿에 반영
   const typed = (el, t, setDirty) => {
@@ -925,7 +949,7 @@ function renderQa() {
   const running = !!q.running;
   const newApp = !!qa;
   const warn = !qaConnected() ? '태블릿이 연결되어 있지 않습니다. QR 로 연결해 주세요.'
-    : !newApp ? '태블릿 앱을 최신 버전(2026.11.25-a 이상)으로 업데이트해야 자동 QA 를 PC 에서 쓸 수 있습니다.'
+    : !newApp ? '태블릿 앱을 최신 버전(2026.11.25-b 이상)으로 업데이트해야 자동 QA 를 PC 에서 쓸 수 있습니다.'
     : !(images && images.before) ? '태블릿에서 환자 사진을 먼저 올려 주세요 (PC 의 [사진 올리기] 도 가능).'
     : q.ready === false ? '태블릿의 AI 연결이 준비되지 않았습니다 (태블릿 [API 키 설정] 확인).' : '';
   $('#qaWarn').hidden = !warn; $('#qaWarn').textContent = warn;
@@ -1049,7 +1073,7 @@ function renderArchive() {
   const a = archive;
   if (!qaConnected() || !a) {
     setHtml($('#archFolders'), '');
-    setHtml($('#archGrid'), `<p class="empty">${!qaConnected() ? '태블릿을 연결하면 태블릿에 저장된 보관함이 보입니다.' : '보관함이 비어 있거나, 태블릿 앱 업데이트(2026.11.25-a 이상)가 필요합니다.'}</p>`);
+    setHtml($('#archGrid'), `<p class="empty">${!qaConnected() ? '태블릿을 연결하면 태블릿에 저장된 보관함이 보입니다.' : '보관함이 비어 있거나, 태블릿 앱 업데이트(2026.11.25-b 이상)가 필요합니다.'}</p>`);
     return;
   }
   const folders = a.folders || [];
@@ -1166,7 +1190,7 @@ function renderRecords() {
   if ($('#recOv').hidden) return;
   if (!qaConnected() || !records) {
     setHtml($('#recTx'), ''); $('#recCount').textContent = '';
-    setHtml($('#recTree'), `<p class="empty">${!qaConnected() ? '태블릿을 연결하면 태블릿에 저장된 환자 기록이 보입니다.' : '아직 저장된 기록이 없거나, 태블릿 앱 업데이트(2026.11.25-a 이상)가 필요합니다.'}</p>`);
+    setHtml($('#recTree'), `<p class="empty">${!qaConnected() ? '태블릿을 연결하면 태블릿에 저장된 환자 기록이 보입니다.' : '아직 저장된 기록이 없거나, 태블릿 앱 업데이트(2026.11.25-b 이상)가 필요합니다.'}</p>`);
     return;
   }
   setHtml($('#recTx'), TX_ALL.map((t) => `<button type="button" data-tx="${esc(t)}" class="${recTx === t ? 'on' : ''}" aria-pressed="${recTx === t}">${esc(t)}</button>`).join(''));
@@ -1446,9 +1470,6 @@ function renderSmile(view) {
   const can = !!sm && state.useAi && !locked() && !(state && state.rz); // 변환 전 첫 화면에서도
   $('#smOpenBar').hidden = smOpen || locked() || !!(state && state.rz);
   $('#smOpen').hidden = !can;
-  $('#smView').hidden = !(sm && sm.made);
-  $('#smView').setAttribute('aria-pressed', String(!!(sm && sm.view)));
-  $('#smView').textContent = sm && sm.view ? '😊 미소 비교 끄기' : '😊 미소 비교';
   $('#smOpen').textContent = sm && sm.made ? '😊 미소 미리보기 다시' : '😊 미소 미리보기';
   if (!sm) smOpen = false;
   $('#smPanel').hidden = !smOpen;
@@ -1459,7 +1480,7 @@ function renderSmile(view) {
   $('#smMake').textContent = sm.busy ? '⏳ 처리 중…' : sm.made ? '😊 다시 입히기' : '😊 미소에 입히기';
   $('#smHint').textContent = !sm.has ? '사진을 올리면 입술 사이 치아를 자동으로 찾아요' : sm.n > 0 ? `치아 영역 ${sm.n}개 선택됨` : '🪄 미소 사진 속 치아를 클릭해 고르세요';
   $('#smMsg').textContent = sm.msg || '';
-  // 🦷 보철 사진 정밀 매칭 (태블릿 앱 2026.11.25-a 이상)
+  // 🦷 보철 사진 정밀 매칭 (태블릿 앱 2026.11.25-b 이상)
   $('#smMatch').hidden = !mm;
   if (mm) {
     const busy = !!mm.busy;
@@ -1485,7 +1506,6 @@ $('#smMatchRun').addEventListener('click', () => { smMWaiting = true; smMSawBusy
 $('#smTabArea').addEventListener('click', () => { smTab = 'area'; showSmileImg(); });
 $('#smTabResult').addEventListener('click', () => { smTab = 'result'; showSmileImg(); });
 $('#smClose').addEventListener('click', () => { smOpen = false; render(); });
-$('#smView').addEventListener('click', () => cmd('smileView', !(state.smile && state.smile.view)));
 $('#smAuto').addEventListener('click', () => cmd('smileAuto'));
 $('#smUndo').addEventListener('click', () => cmd('smileUndo'));
 $('#smClear').addEventListener('click', () => cmd('smileClear'));
@@ -1525,13 +1545,15 @@ $('#smP2File').addEventListener('change', (e) => sendPhoto(e, 'matchPhoto', '#sm
 // =============================================================================
 // 🖼 원본 2슬롯 (v3.35): 원본 1 미소 · 원본 2 개구기 · 변환할 사진 고르기 · 2단계 최종 미소
 // =============================================================================
-let slotImg = {}, slotUploadTo = 0;
+let slotImg = {}, slotUploadTo = 0, slotReqAt = 0;
 function renderSlots() {
   const bar = $('#slotBar'); if (!bar) return;
   const sl = state && state.slots;
   bar.hidden = !sl || !!state.briefing || locked();
   if (bar.hidden) return;
   const fin = sl.final || {};
+  // 카드 사진이 안 왔으면 태블릿에 다시 요청 (5초에 한 번)
+  if (((sl.s1 && !slotImg.s1) || (sl.s2 && !slotImg.s2)) && Date.now() - slotReqAt > 5000) { slotReqAt = Date.now(); cmd('slotImgReq'); }
   for (const k of [1, 2]) {
     const b = bar.querySelector(`.slot[data-slot="${k}"]`);
     const has = !!sl['s' + k], sel = sl.cur === k;
@@ -1705,3 +1727,5 @@ $('#pcCatch').addEventListener('click', () => pcCheck(true));
 
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
 start();
+
+document.addEventListener('click', (e) => { if (e.target && e.target.id === 'savePick') { e.preventDefault(); openOv('recOv'); renderRecords(); } });

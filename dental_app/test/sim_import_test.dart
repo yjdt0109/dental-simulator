@@ -65,7 +65,7 @@ void main() {
     await _settle(t);
     expect(msg, contains('1번으로 가져왔습니다'));
     expect(find.byType(RoiEditor), findsNothing); // 결과 비교 화면으로
-    expect(find.textContaining('1번 (QA·B)'), findsWidgets);
+    expect(find.textContaining('After · QA·B'), findsWidgets);
     // 다른 사진(보관함 케이스) → 새 환자
     final other = Uint8List.fromList(
       img.encodeJpg(
@@ -82,7 +82,7 @@ void main() {
     });
     await _settle(t);
     expect(msg, contains('1번으로 가져왔습니다'));
-    expect(find.textContaining('(보관함·옵션 A)'), findsWidgets);
+    expect(find.textContaining('After · 보관함·옵션 A'), findsWidgets);
     expect(identical(QaRemote.instance.originalOf!(), other), isTrue);
     expect(t.takeException(), isNull);
   });
@@ -134,8 +134,8 @@ void main() {
     });
     await _settle(t);
     expect(find.textContaining('박지은'), findsWidgets);
-    expect(find.textContaining('2번 (크기조절)'), findsWidgets);
-    expect(find.text('😊 미소 비교'), findsOneWidget); // 미소 사진도 함께
+    expect(find.textContaining('박지은 After 2'), findsWidgets); // 목록에 결과 2장
+    expect(find.textContaining('미소 미리보기'), findsWidgets); // 미소 사진도 함께
     expect(find.text('다음 주 재상담'), findsOneWidget); // 상담 메모
     // 불러온 뒤 새 미소 사진을 올리면 → 같은 환자 기록 폴더에 저장
     await t.runAsync(() async {

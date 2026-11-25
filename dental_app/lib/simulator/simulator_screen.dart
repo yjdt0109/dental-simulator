@@ -1101,13 +1101,15 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
           });
         }
         return;
-      case 'before':
-        if (p.afterBytes != null && !p.editing) {
-          setState(() {
-            p.remember('Before 보기');
-            p.editing = true;
-          });
-        }
+      case 'before': // 원본 화면 (서비컬 라인·🪄 치아 고르기)
+        setState(() => _toEditView(p));
+        return;
+      case 'confirmSave': // PC 💾 저장 및 상담 완료 (PC 에서 이미 확인 받음)
+        _confirm(ask: false);
+        return;
+      case 'slotImgReq': // PC 카드 사진이 없으면 다시 보내 달라고
+        _slotImgKey = null;
+        _smilePublish(p);
         return;
       case 'after':
         if (p.afterBytes != null && p.editing) {
@@ -1183,7 +1185,10 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
         AiService.instance.saveRequest('');
         setState(() {});
       case 'drawLines':
-        setState(() => _drawLines = v == true);
+        setState(() {
+          _drawLines = v == true;
+          if (_drawLines) _toEditView(p);
+        });
       // 서비컬 라인: 한 줄 추가 / 마지막 줄 취소 / 모두 지움 (순서대로 처리 → 빠뜨림 없음)
       case 'lineAdd':
         final l = _lineFrom(v);
@@ -1611,8 +1616,17 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
   // ---------------------------------------------------------------------------
   // 상담 동의
   // ---------------------------------------------------------------------------
-  Future<void> _confirm() async {
+  /// 원본 화면(영역·선·치아 고르기)으로
+  void _toEditView(PatientPhoto p) {
+    if (p.editing) return;
+    if (p.afterBytes != null) p.remember('Before 보기');
+    p.editing = true;
+    _smileView = false;
+  }
+
+  Future<void> _confirm({bool ask = true}) async {
     final p = _cur!, c = _c;
+    if (c.doneAt != null) return _toast('이미 저장하고 상담을 완료했습니다.');
     if (c.name.trim().isEmpty) return _toast('환자 이름을 입력해 주세요.');
     if (c.teeth.isEmpty) return _toast('치료할 치아를 차트에서 선택해 주세요.');
     if (!_converted) return _toast('먼저 [After 변환하기]를 눌러 After를 만들어 주세요.');
@@ -1620,90 +1634,99 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
         teeth = sortTeeth(c.teeth);
     ScaffoldMessenger.of(context)
         .removeCurrentSnackBar(); // 알림이 떠 있는 채로 확인 창을 겹치지 않게
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: Colors.white,
-        surfaceTintColor: Colors.transparent,
-        title: const Text(
-          '시뮬레이션 결과를 저장하고 상담을 완료할까요?',
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.w800,
-            color: AppColors.blueDeep,
-          ),
-        ),
-        content: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 440),
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(12),
-                  child: AspectRatio(
-                    aspectRatio: 16 / 9,
-                    child: Image.memory(p.afterBytes!, fit: BoxFit.cover),
+    final ok = !ask
+        ? true
+        : await showDialog<bool>(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              backgroundColor: Colors.white,
+              surfaceTintColor: Colors.transparent,
+              title: const Text(
+                '시뮬레이션 결과를 저장하고 상담을 완료할까요?',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.blueDeep,
+                ),
+              ),
+              content: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 440),
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: AspectRatio(
+                          aspectRatio: 16 / 9,
+                          child: Image.memory(p.afterBytes!, fit: BoxFit.cover),
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      for (final kv in [
+                        ('상담 날짜', formatConsultDate(c.date)),
+                        ('환자', '${c.name.trim()} 님'),
+                        ('사진', '${p.type} · ${p.time}'),
+                        ('치료 항목', c.tx.isEmpty ? '선택 안 함' : c.tx.join(', ')),
+                        (
+                          '치료 부위',
+                          '${teeth.map((t) => '#$t').join(' ')} (${teeth.length}개)',
+                        ),
+                        (
+                          '희망 셰이드',
+                          shade == null
+                              ? '선택 안 함'
+                              : '${shade.id} · ${shade.desc}',
+                        ),
+                        (
+                          '메모',
+                          c.memo.trim().isEmpty ? '(메모 없음)' : c.memo.trim(),
+                        ),
+                      ])
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 3),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              SizedBox(
+                                width: 76,
+                                child: Text(
+                                  kv.$1,
+                                  style: const TextStyle(
+                                    color: AppColors.gray500,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                              ),
+                              Expanded(
+                                child: Text(
+                                  kv.$2,
+                                  style: const TextStyle(fontSize: 13),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                    ],
                   ),
                 ),
-                const SizedBox(height: 14),
-                for (final kv in [
-                  ('상담 날짜', formatConsultDate(c.date)),
-                  ('환자', '${c.name.trim()} 님'),
-                  ('사진', '${p.type} · ${p.time}'),
-                  ('치료 항목', c.tx.isEmpty ? '선택 안 함' : c.tx.join(', ')),
-                  (
-                    '치료 부위',
-                    '${teeth.map((t) => '#$t').join(' ')} (${teeth.length}개)',
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx, false),
+                  child: const Text('취소'),
+                ),
+                FilledButton(
+                  style: FilledButton.styleFrom(
+                    minimumSize: const Size(150, 46),
                   ),
-                  (
-                    '희망 셰이드',
-                    shade == null ? '선택 안 함' : '${shade.id} · ${shade.desc}',
-                  ),
-                  ('메모', c.memo.trim().isEmpty ? '(메모 없음)' : c.memo.trim()),
-                ])
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 3),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        SizedBox(
-                          width: 76,
-                          child: Text(
-                            kv.$1,
-                            style: const TextStyle(
-                              color: AppColors.gray500,
-                              fontSize: 13,
-                            ),
-                          ),
-                        ),
-                        Expanded(
-                          child: Text(
-                            kv.$2,
-                            style: const TextStyle(fontSize: 13),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+                  onPressed: () => Navigator.pop(ctx, true),
+                  child: const Text('저장 및 상담 완료'),
+                ),
               ],
             ),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('취소'),
-          ),
-          FilledButton(
-            style: FilledButton.styleFrom(minimumSize: const Size(150, 46)),
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('저장 및 상담 완료'),
-          ),
-        ],
-      ),
-    );
+          );
     if (ok == true && mounted) {
       setState(() => c.doneAt = DateTime.now());
       // 🗂 환자 기록: 날짜 폴더 › 환자이름 폴더에 사진·상담 내용 저장
@@ -1734,6 +1757,12 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
         );
         p.recordId = rec.id;
         if (!mounted) return;
+        setState(() {
+          // PC 화면에도 알림
+          _notice =
+              '💾 ${c.name} 님 결과를 저장하고 상담을 완료했습니다 · 🗂 ${rec.dayText} › ${rec.name}';
+          _noticeAt = DateTime.now().millisecondsSinceEpoch;
+        });
         ScaffoldMessenger.of(context)
           ..hideCurrentSnackBar()
           ..showSnackBar(
@@ -2291,7 +2320,7 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
               howto,
               style: const TextStyle(fontSize: 12, color: AppColors.gray500),
             ),
-          if (!_briefing && mode == _ViewMode.edit && _useAi) _guideCheck(p),
+          if (!_briefing && _useAi) _guideCheck(p),
           if (mode != _ViewMode.edit && _converted) _resultTools(p),
         ],
       ),
@@ -2350,17 +2379,6 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
               tooltip: '시뮬레이션 위에 원본의 마진선(초록)·절단선(노랑)을 점선으로 겹쳐 길이·마진 유지를 확인',
               selected: _showContour,
               onSelected: (v) => setState(() => _showContour = v),
-            ),
-          if (hasSmile)
-            FilterChip(
-              avatar: const Icon(
-                Icons.sentiment_very_satisfied_outlined,
-                size: 18,
-              ),
-              label: const Text('😊 미소 비교'),
-              tooltip: '환자 미소 사진 ↔ 시뮬레이션 치아를 입힌 미소를 비교',
-              selected: _smileView,
-              onSelected: (v) => setState(() => _smileView = v),
             ),
           if (canResize)
             OutlinedButton.icon(
@@ -2825,7 +2843,10 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
           value: _drawLines,
           onChanged: _c.doneAt != null
               ? null
-              : (v) => setState(() => _drawLines = v ?? false),
+              : (v) => setState(() {
+                  _drawLines = v ?? false;
+                  if (_drawLines) _toEditView(p); // 원본 화면에서 선 그리기
+                }),
           dense: true,
           controlAffinity: ListTileControlAffinity.leading,
           shape: RoundedRectangleBorder(
@@ -2956,20 +2977,22 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
     }
     final name = p.consult.name.trim();
     final r = n <= p.results.length ? p.results[n - 1] : null;
-    final e = r?.engine ?? '';
     final ck = r == null || r.check.isEmpty
         ? ''
         : r.check.startsWith('✓')
         ? ' 🦷✓'
         : ' 🦷⚠';
-    return '${name.isEmpty ? '시뮬레이션' : name} $n번${e.isEmpty ? '' : ' ($e)'}$ck';
+    // 변환 결과 = After (엔진 이름은 아래 작은 글씨로)
+    return '${name.isEmpty ? '' : '$name '}After $n$ck';
   }
 
   /// 사진 아래 작은 글씨 (치료 전 / 시뮬레이션 / 불러온 사진 설명)
   String _sub(PatientPhoto p, int n) => n == 0
       ? '치료 전'
       : n > 0
-      ? 'After'
+      ? (n <= p.results.length && p.results[n - 1].engine.isNotEmpty
+            ? 'After · ${p.results[n - 1].engine}'
+            : 'After')
       : (-n <= p.extras.length ? p.extras[-n - 1].sub : '');
 
   /// 원본 윤곽 점선은 변환 결과에만

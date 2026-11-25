@@ -122,9 +122,10 @@ void main() {
     await _settle(t);
     Navigator.of(t.element(find.byType(RecordsScreen))).pop();
     await _settle(t);
-    expect(find.textContaining('최유나 1번 (C)'), findsWidgets); // 불러온 결과 1장 (C)
-    expect(find.textContaining('2번'), findsNothing);
-    expect(find.text('😊 미소 비교'), findsOneWidget);
+    expect(find.textContaining('최유나 After 1'), findsWidgets); // 불러온 결과 1장
+    expect(find.textContaining('After · C'), findsWidgets); // 엔진은 아래 작은 글씨
+    expect(find.textContaining('After 2'), findsNothing);
+    expect(find.text('😊 미소 비교'), findsNothing); // 미소 비교 버튼은 없앰 (목록에서 비교)
     expect(find.byType(RoiEditor), findsNothing);
     // 브리핑 목록에서 ✕ 로 결과 빼기 (원본은 ✕ 없음)
     await t.runAsync(() async {

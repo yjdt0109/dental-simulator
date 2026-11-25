@@ -63,25 +63,29 @@ void main() {
     expect(find.textContaining('셰이드 B1'), findsWidgets);
     // 라벨: 원본 / 박서준 1번
     expect(find.text('원본'), findsWidgets);
-    expect(find.text('박서준 1번'), findsWidgets);
+    expect(find.text('박서준 After 1'), findsWidgets);
     // 두 번째 변환 → 박서준 2번
     send({'t': 'convert'});
-    for (var i = 0; i < 30 && find.text('박서준 2번').evaluate().isEmpty; i++) {
+    for (
+      var i = 0;
+      i < 30 && find.text('박서준 After 2').evaluate().isEmpty;
+      i++
+    ) {
       await t.runAsync(
         () => Future<void>.delayed(const Duration(milliseconds: 60)),
       );
       await t.pump(const Duration(milliseconds: 500));
     }
-    expect(find.text('박서준 2번'), findsWidgets);
+    expect(find.text('박서준 After 2'), findsWidgets);
     // 이전으로 → 1번, 다시 돌아가기 → 2번
     send({'t': 'undo'});
     await t.pump();
-    expect(find.text('박서준 2번'), findsNothing);
-    expect(find.text('박서준 1번'), findsWidgets);
+    expect(find.text('박서준 After 2'), findsNothing);
+    expect(find.text('박서준 After 1'), findsWidgets);
     expect(find.text('다시 돌아가기'), findsOneWidget);
     send({'t': 'redo'});
     await t.pump();
-    expect(find.text('박서준 2번'), findsWidgets);
+    expect(find.text('박서준 After 2'), findsWidgets);
     expect(find.text('다시 돌아가기'), findsNothing);
     // 브리핑: 왼쪽 목록에서 원본·1번·2번 고르기
     send({'t': 'briefing', 'v': true});
@@ -91,8 +95,8 @@ void main() {
     await t.pump();
     expect(find.byType(SliderCompare), findsOneWidget);
     final sc = t.widget<SliderCompare>(find.byType(SliderCompare));
-    expect(sc.beforeTitle, '박서준 1번');
-    expect(sc.afterTitle, '박서준 2번');
+    expect(sc.beforeTitle, '박서준 After 1');
+    expect(sc.afterTitle, '박서준 After 2');
     send({'t': 'cmpToggle', 'v': 2}); // 2번 해제 → 1번만 크게
     await t.pump();
     expect(find.byType(SliderCompare), findsNothing);
