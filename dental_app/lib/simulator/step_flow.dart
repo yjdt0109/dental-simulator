@@ -134,10 +134,14 @@ extension _StepFlow on _SimulatorHomeScreenState {
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           Expanded(
-                            child: SingleChildScrollView(child: _stepPanel()),
+                            child: SingleChildScrollView(
+                              child: _advOpen ? _advancedPanel() : _stepPanel(),
+                            ),
                           ),
-                          const SizedBox(height: 10),
-                          _stepNav(),
+                          if (!_advOpen) ...[
+                            const SizedBox(height: 10),
+                            _stepNav(),
+                          ],
                         ],
                       ),
                     ),
@@ -169,7 +173,9 @@ extension _StepFlow on _SimulatorHomeScreenState {
             padding: const EdgeInsets.all(16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [_stepPanel(), const SizedBox(height: 12), _stepNav()],
+              children: _advOpen
+                  ? [_advancedPanel()]
+                  : [_stepPanel(), const SizedBox(height: 12), _stepNav()],
             ),
           ),
         ],
@@ -327,7 +333,7 @@ extension _StepFlow on _SimulatorHomeScreenState {
             '[After 변환하기]를 누르면 고른 치아만 새로 만들어요. 결과는 왼쪽 목록에 After 1, 2 … 로 쌓이고, '
                 '결과를 누르면 그 결과를 기준으로 다시 다듬을 수 있어요.',
           ),
-          _convertBox(locked),
+          _step4(p, locked),
         ],
       ),
       5 => Column(
@@ -620,4 +626,290 @@ extension _StepFlow on _SimulatorHomeScreenState {
       ),
     );
   }
+
+  // ── ④ After 만들기 (간단): 큰 버튼 · 추가 요청 · 엔진 한 줄 ─────────────────
+  Widget _step4(PatientPhoto p, bool locked) {
+    final c = _c;
+    final converted = _converted, stale = _stale;
+    final eff = _useAi ? _engineNow() : null;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          eff == null
+              ? '엔진: AI 꺼짐 (기본 미백 방식)'
+              : '엔진: ${eff.engine.tag} · ${eff.engine.label}${eff.note == null ? '' : '\n${eff.note}'}',
+          style: const TextStyle(fontSize: 12.5, color: AppColors.gray500),
+        ),
+        const SizedBox(height: 6),
+        _baseLine(p),
+        if (_useAi) ...[
+          const Text(
+            '추가 요청 (선택)',
+            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 4),
+          TextField(
+            controller: _aiReqCtrl,
+            enabled: !locked,
+            minLines: 2,
+            maxLines: 5,
+            style: const TextStyle(fontSize: 13, height: 1.4),
+            decoration: const InputDecoration(
+              isDense: true,
+              contentPadding: EdgeInsets.all(10),
+              hintText: '예: 11·21 절단끝 0.5mm 길게, 좌우 대칭, 22번 깨진 끝 복원',
+            ),
+            onChanged: (v) {
+              AiService.instance.saveRequest(v);
+              _ss(() {});
+            },
+          ),
+          const SizedBox(height: 10),
+        ],
+        SizedBox(
+          height: 56,
+          child: FilledButton.icon(
+            onPressed: locked || _converting ? null : _convert,
+            icon: _converting
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
+                  )
+                : const Icon(Icons.auto_fix_high_rounded),
+            label: Text(
+              _converting
+                  ? '만드는 중…'
+                  : converted
+                  ? '✨ 다시 만들기 (After ${p.results.length + 1})'
+                  : '✨ After 만들기',
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+            ),
+          ),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          _converting
+              ? _convertMsg
+              : !converted
+              ? '고른 치아만 새로 만들어요. 결과는 왼쪽 목록에 쌓입니다.'
+              : stale
+              ? '설정이 바뀌었어요 · [다시 만들기]로 반영하세요'
+              : '✓ 셰이드 ${c.shade ?? '선택 안 함'}로 만들었어요 · 마음에 들면 [다음]',
+          style: TextStyle(
+            fontSize: 12,
+            color: stale ? const Color(0xFFB26A00) : AppColors.gray500,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: TextButton.icon(
+            onPressed: () => _ss(() => _advOpen = true),
+            icon: const Icon(Icons.tune_rounded, size: 18),
+            label: const Text('엔진·강도·지시문 바꾸기 (⚙ 고급)'),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ── ⚙ 고급 설정 패널 ──────────────────────────────────────────────
+  Widget _advancedPanel() {
+    final p = _cur!;
+    final c = _c;
+    final locked = c.doneAt != null;
+    Widget sec(String t, Widget child, {String? help}) => Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(t, style: const TextStyle(fontWeight: FontWeight.w800)),
+          if (help != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 2),
+              child: Text(
+                help,
+                style: const TextStyle(fontSize: 12, color: AppColors.gray500),
+              ),
+            ),
+          const SizedBox(height: 6),
+          child,
+        ],
+      ),
+    );
+    return Material(
+      type: MaterialType.transparency,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              const Expanded(
+                child: Text(
+                  '⚙ 고급 설정',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.blueDeep,
+                  ),
+                ),
+              ),
+              FilledButton.tonal(
+                style: FilledButton.styleFrom(minimumSize: const Size(0, 40)),
+                onPressed: () => _ss(() => _advOpen = false),
+                child: Text('닫고 $_step단계로'),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          sec(
+            'AI 엔진 · 자동 임상 지시 · 추가 요청',
+            _aiRow(locked),
+            help: '평소엔 옵션 B. 비교해 보고 싶을 때만 바꾸세요.',
+          ),
+          sec(
+            '적용 강도 ${c.strength}%',
+            Slider(
+              value: c.strength.toDouble(),
+              min: 30,
+              max: 100,
+              divisions: 14,
+              label: '${c.strength}%',
+              onChanged: locked
+                  ? null
+                  : (v) => _ss(() => c.strength = v.round()),
+            ),
+          ),
+          sec('미소 사진 참고 변환 (원본 2장)', _smileRefBox(p)),
+          if (_useAi)
+            sec(
+              '서비컬 라인 직접 그리기',
+              _guideCheck(p),
+              help: '🪄 치아 고르기 대신 잇몸선을 손으로 그릴 때 (체크하면 원본 화면으로)',
+            ),
+          sec(
+            '보기',
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              value: _showContour,
+              onChanged: (v) => _ss(() => _showContour = v),
+              title: const Text('원본 윤곽 겹쳐 보기'),
+            ),
+          ),
+          if (EyeMasker.supported)
+            sec(
+              '개인정보',
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                value: _eyeMask,
+                onChanged: (v) {
+                  _ss(() => _eyeMask = v);
+                  SharedPreferences.getInstance()
+                      .then(
+                        (pr) => pr.setBool(
+                          _SimulatorHomeScreenState._prefEyeMask,
+                          v,
+                        ),
+                      )
+                      .ignore();
+                },
+                title: const Text('개구기 사진 눈 자동 가리기'),
+              ),
+            ),
+          sec(
+            '예전 미소 기능',
+            OutlinedButton.icon(
+              onPressed: () => _openSmile(p),
+              icon: const Icon(Icons.sentiment_very_satisfied_outlined),
+              label: const Text('😊 미소 미리보기 (미소에 입히기 · 정밀 매칭)'),
+            ),
+            help: '보통은 6단계 Final Smile 을 쓰세요.',
+          ),
+          sec(
+            'API 키',
+            OutlinedButton.icon(
+              onPressed: () =>
+                  showAiSettingsSheet(context).then((_) => _ss(() {})),
+              icon: const Icon(Icons.key_rounded),
+              label: const Text('🔑 API 키 · 모델 설정'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── 🧪 전문가 메뉴 ───────────────────────────────────────────────
+  Widget _expertMenu() => PopupMenuButton<String>(
+    tooltip: '🧪 전문가',
+    color: Colors.white,
+    surfaceTintColor: Colors.transparent,
+    icon: const Icon(Icons.science_outlined, color: AppColors.blue),
+    onSelected: (v) => switch (v) {
+      'qa' => _openQa(),
+      'archive' => _openArchive(),
+      'old' => _toggleUi(),
+      'reset' => _resetConsult(),
+      _ => _logout(),
+    },
+    itemBuilder: (_) => [
+      if (_pro)
+        const PopupMenuItem(
+          value: 'qa',
+          child: ListTile(
+            leading: Icon(Icons.smart_toy_outlined),
+            title: Text('🤖 자동 QA'),
+          ),
+        ),
+      if (_pro)
+        const PopupMenuItem(
+          value: 'archive',
+          child: ListTile(
+            leading: Icon(Icons.collections_bookmark_outlined),
+            title: Text('📚 프롬프트 보관함'),
+          ),
+        ),
+      const PopupMenuItem(
+        value: 'old',
+        child: ListTile(
+          leading: Icon(Icons.view_quilt_outlined),
+          title: Text('예전 화면으로 (모든 기능)'),
+        ),
+      ),
+      const PopupMenuItem(
+        value: 'reset',
+        child: ListTile(
+          leading: Icon(Icons.restart_alt_rounded),
+          title: Text('상담 초기화'),
+        ),
+      ),
+      const PopupMenuItem(
+        value: 'logout',
+        child: ListTile(
+          leading: Icon(Icons.logout_rounded),
+          title: Text('로그아웃'),
+        ),
+      ),
+    ],
+  );
+
+  /// 새 화면 위쪽 버튼: ＋ 새 작업 · 🗂 환자 기록 · PC 연결 · ⚙ 고급 · 🧪 전문가
+  List<Widget> _stepActions(bool phone) => [
+    _barButton(Icons.add_box_outlined, '＋ 새 작업', phone, _newCase),
+    _barButton(Icons.folder_shared_outlined, '🗂 환자 기록', phone, _openRecords),
+    CastButton(iconOnly: phone),
+    _barButton(
+      _advOpen ? Icons.tune : Icons.tune_rounded,
+      _advOpen ? '⚙ 고급 닫기' : '⚙ 고급',
+      phone,
+      () => _ss(() => _advOpen = !_advOpen),
+    ),
+    _expertMenu(),
+    const SizedBox(width: 6),
+  ];
 }

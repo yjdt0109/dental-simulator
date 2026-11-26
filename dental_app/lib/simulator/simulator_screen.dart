@@ -98,6 +98,7 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
   // 🆕 단계형 새 화면 (기본). [예전 화면] 으로 바꿀 수 있음
   bool _newUi = !debugStepFlowOff;
   int _step = 1;
+  bool _advOpen = false; // ⚙ 고급 설정 패널
   static const _prefNewUi = 'ui.stepFlow';
   static const _prefEngineB = 'ui.stepFlow.engineB';
   void _ss(VoidCallback fn) => setState(fn);
@@ -2042,109 +2043,116 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
           ),
         ],
       ),
-      actions: [
-        if (!narrow)
-          _barButton(
-            Icons.add_box_outlined,
-            '＋ 새 작업',
-            phone,
-            _cur == null ? null : _newCase,
-          ),
-        if (!narrow)
-          IconButton(
-            tooltip: _newUi ? '예전 화면으로 (모든 기능)' : '새 단계 화면으로',
-            onPressed: _toggleUi,
-            icon: Icon(
-              _newUi ? Icons.view_quilt_outlined : Icons.linear_scale_rounded,
-              color: AppColors.blue,
-            ),
-          ),
-        CastButton(iconOnly: phone),
-        if (_pro)
-          _barButton(
-            Icons.smart_toy_outlined,
-            '🤖 자동 QA',
-            narrow,
-            _cur == null ? null : _openQa,
-          ),
-        if (_pro && !narrow)
-          _barButton(
-            Icons.collections_bookmark_outlined,
-            '📚 보관함',
-            true,
-            _openArchive,
-          ),
-        _barButton(
-          Icons.folder_shared_outlined,
-          '🗂 환자 기록',
-          MediaQuery.sizeOf(context).width < 1400,
-          _openRecords,
-        ),
-        if (narrow)
-          // 좁은 화면: 자주 안 쓰는 버튼은 [더보기] 메뉴로
-          PopupMenuButton<String>(
-            tooltip: '더보기',
-            icon: const Icon(Icons.more_vert_rounded, color: AppColors.blue),
-            color: Colors.white,
-            surfaceTintColor: Colors.transparent,
-            onSelected: (v) => switch (v) {
-              'new' => _cur == null ? null : _newCase(),
-              'ui' => _toggleUi(),
-              'archive' => _openArchive(),
-              'reset' => _cur == null ? null : _resetConsult(),
-              _ => _logout(),
-            },
-            itemBuilder: (_) => [
-              const PopupMenuItem(
-                value: 'new',
-                child: ListTile(
-                  leading: Icon(Icons.add_box_outlined),
-                  title: Text('＋ 새 작업'),
+      actions: _newUi && _cur != null
+          ? _stepActions(narrow)
+          : [
+              if (!narrow)
+                _barButton(
+                  Icons.add_box_outlined,
+                  '＋ 새 작업',
+                  phone,
+                  _cur == null ? null : _newCase,
                 ),
-              ),
-              PopupMenuItem(
-                value: 'ui',
-                child: ListTile(
-                  leading: const Icon(Icons.view_quilt_outlined),
-                  title: Text(_newUi ? '예전 화면으로' : '새 단계 화면으로'),
-                ),
-              ),
-              if (_pro)
-                const PopupMenuItem(
-                  value: 'archive',
-                  child: ListTile(
-                    leading: Icon(Icons.collections_bookmark_outlined),
-                    title: Text('📚 프롬프트 보관함'),
+              if (!narrow)
+                IconButton(
+                  tooltip: _newUi ? '예전 화면으로 (모든 기능)' : '새 단계 화면으로',
+                  onPressed: _toggleUi,
+                  icon: Icon(
+                    _newUi
+                        ? Icons.view_quilt_outlined
+                        : Icons.linear_scale_rounded,
+                    color: AppColors.blue,
                   ),
                 ),
-              PopupMenuItem(
-                value: 'reset',
-                enabled: _cur != null,
-                child: const ListTile(
-                  leading: Icon(Icons.restart_alt_rounded),
-                  title: Text('상담 초기화'),
+              CastButton(iconOnly: phone),
+              if (_pro)
+                _barButton(
+                  Icons.smart_toy_outlined,
+                  '🤖 자동 QA',
+                  narrow,
+                  _cur == null ? null : _openQa,
                 ),
-              ),
-              const PopupMenuItem(
-                value: 'logout',
-                child: ListTile(
-                  leading: Icon(Icons.logout_rounded),
-                  title: Text('로그아웃'),
+              if (_pro && !narrow)
+                _barButton(
+                  Icons.collections_bookmark_outlined,
+                  '📚 보관함',
+                  true,
+                  _openArchive,
                 ),
+              _barButton(
+                Icons.folder_shared_outlined,
+                '🗂 환자 기록',
+                MediaQuery.sizeOf(context).width < 1400,
+                _openRecords,
               ),
+              if (narrow)
+                // 좁은 화면: 자주 안 쓰는 버튼은 [더보기] 메뉴로
+                PopupMenuButton<String>(
+                  tooltip: '더보기',
+                  icon: const Icon(
+                    Icons.more_vert_rounded,
+                    color: AppColors.blue,
+                  ),
+                  color: Colors.white,
+                  surfaceTintColor: Colors.transparent,
+                  onSelected: (v) => switch (v) {
+                    'new' => _cur == null ? null : _newCase(),
+                    'ui' => _toggleUi(),
+                    'archive' => _openArchive(),
+                    'reset' => _cur == null ? null : _resetConsult(),
+                    _ => _logout(),
+                  },
+                  itemBuilder: (_) => [
+                    const PopupMenuItem(
+                      value: 'new',
+                      child: ListTile(
+                        leading: Icon(Icons.add_box_outlined),
+                        title: Text('＋ 새 작업'),
+                      ),
+                    ),
+                    PopupMenuItem(
+                      value: 'ui',
+                      child: ListTile(
+                        leading: const Icon(Icons.view_quilt_outlined),
+                        title: Text(_newUi ? '예전 화면으로' : '새 단계 화면으로'),
+                      ),
+                    ),
+                    if (_pro)
+                      const PopupMenuItem(
+                        value: 'archive',
+                        child: ListTile(
+                          leading: Icon(Icons.collections_bookmark_outlined),
+                          title: Text('📚 프롬프트 보관함'),
+                        ),
+                      ),
+                    PopupMenuItem(
+                      value: 'reset',
+                      enabled: _cur != null,
+                      child: const ListTile(
+                        leading: Icon(Icons.restart_alt_rounded),
+                        title: Text('상담 초기화'),
+                      ),
+                    ),
+                    const PopupMenuItem(
+                      value: 'logout',
+                      child: ListTile(
+                        leading: Icon(Icons.logout_rounded),
+                        title: Text('로그아웃'),
+                      ),
+                    ),
+                  ],
+                )
+              else ...[
+                _barButton(
+                  Icons.restart_alt_rounded,
+                  '상담 초기화',
+                  false,
+                  _cur == null ? null : _resetConsult,
+                ),
+                _barButton(Icons.logout_rounded, '로그아웃', false, _logout),
+              ],
+              const SizedBox(width: 8),
             ],
-          )
-        else ...[
-          _barButton(
-            Icons.restart_alt_rounded,
-            '상담 초기화',
-            false,
-            _cur == null ? null : _resetConsult,
-          ),
-          _barButton(Icons.logout_rounded, '로그아웃', false, _logout),
-        ],
-        const SizedBox(width: 8),
-      ],
       bottom: const PreferredSize(
         preferredSize: Size.fromHeight(1),
         child: Divider(height: 1, color: AppColors.gray200),

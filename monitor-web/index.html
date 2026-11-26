@@ -9,14 +9,14 @@
 <link rel="icon" href="icons/icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@500;600;700&family=Noto+Sans+KR:wght@400;500;700;800&display=swap">
-<link rel="stylesheet" href="style.css?v=3.40">
+<link rel="stylesheet" href="style.css?v=3.41">
 </head>
 <body>
 <header class="bar">
   <div class="logo" aria-hidden="true">
     <svg width="22" height="22" viewBox="0 0 100 100"><path d="M32 24C18 24 17 42 22 52C27 62 28 80 36 80C43 80 42 62 50 62C58 62 57 80 64 80C72 80 73 62 78 52C83 42 82 24 68 24C60 24 56 29 50 29C44 29 40 24 32 24Z" fill="none" stroke="#fff" stroke-width="6" stroke-linejoin="round"/><line x1="50" y1="14" x2="50" y2="88" stroke="#fff" stroke-width="5" stroke-linecap="round"/></svg>
   </div>
-  <div class="brand"><b>상담 모니터 <span class="ver">v3.40</span></b><small id="sub">B&amp;A 치과 시뮬레이터</small></div>
+  <div class="brand"><b>상담 모니터 <span class="ver">v3.41</span></b><small id="sub">B&amp;A 치과 시뮬레이터</small></div>
   <select id="roomName" aria-label="상담실 이름">
     <option>상담실 1</option><option>상담실 2</option><option>상담실 3</option><option>상담실 4</option><option>원장실</option><option>대기실 TV</option>
   </select>
@@ -275,36 +275,36 @@
       </div>
 
       <div class="p-sec ai-box">
-        <label class="switch"><input type="checkbox" id="useAi"><span>🤖 AI 시뮬레이션 사용</span></label>
-        <small class="p-note" id="aiNote"></small>
-      <div class="engine-box" id="engineBox" hidden>
-        <h3>AI 시뮬레이션 엔진 <small>(하나 선택 · API 키는 태블릿 [API 키 설정]에서)</small></h3>
-        <div class="engines" id="engines"></div>
-        <small class="p-note" id="engineNote"></small>
-      </div>
+        <small class="p-note" id="engineNow"></small>
         <div id="aiReqBox">
+          <div class="p-row between"><h3>추가 요청 <small>(선택 · 직접 입력 · 한글 OK)</small></h3><button type="button" class="btn sm" id="aiDefault" hidden>지우기</button></div>
+          <textarea id="aiReq" rows="3" placeholder="예: 11·21 절단끝 0.5mm 길게, 좌우 대칭, 22번 깨진 끝 복원"></textarea>
+        </div>
+        <details class="adv" id="pcAdv">
+          <summary>⚙ 고급 (AI 켜기·엔진·자동 지시·강도·미소 참고)</summary>
+          <label class="switch"><input type="checkbox" id="useAi"><span>🤖 AI 시뮬레이션 사용</span></label>
+          <small class="p-note" id="aiNote"></small>
+          <div class="engine-box" id="engineBox" hidden>
+            <h3>AI 시뮬레이션 엔진 <small>(하나 선택 · 평소엔 옵션 B)</small></h3>
+            <div class="engines" id="engines"></div>
+            <small class="p-note" id="engineNote"></small>
+          </div>
           <div class="auto-box">
             <h3>자동 임상 지시 <small>(치료 항목·부위·셰이드 기준)</small></h3>
             <small class="p-auto" id="aiAuto"></small>
             <details><summary>AI에 보낼 전체 지시 보기</summary><pre id="aiPrompt"></pre></details>
           </div>
-          <div class="p-row between"><h3>추가 요청 <small>(선택 · 직접 입력 · 한글 OK)</small></h3><button type="button" class="btn sm" id="aiDefault" hidden>지우기</button></div>
-          <textarea id="aiReq" rows="3" placeholder="자동 임상 지시에 더할 내용 (예: 11, 21 길이 1mm 늘리고 정중선 맞추기)"></textarea>
-        </div>
-      </div>
-
-      <div class="p-sec">
-        <div class="p-row between"><h3>적용 강도</h3><b id="strengthVal">90%</b></div>
-        <input type="range" id="strength" min="30" max="100" step="5" value="90">
-      </div>
-
-      <div class="smref" id="smRef" hidden>
-        <div id="smRefNone"><small>😊 <b>원본 2장 방식</b>: 미소 사진을 넣으면 미소에 어울리는 치아로 변환하고, 끝나면 미소 사진에 자동으로 맞춰 최종 미소 결과까지 만들어요</small>
-          <button type="button" class="btn sm" id="smRefAdd">😊 미소 사진 넣기</button></div>
-        <div id="smRefHas">
-          <label><input type="checkbox" id="smRefOn"> 😊 미소 사진도 참고해서 변환 (원본 2장)</label>
-          <label><input type="checkbox" id="smRefAuto"> 변환 후 미소 사진에 자동으로 맞추기 (최종: 미소 결과)</label>
-        </div>
+          <div class="p-row between"><h3>적용 강도</h3><b id="strengthVal">90%</b></div>
+          <input type="range" id="strength" min="30" max="100" step="5" value="90">
+          <div class="smref" id="smRef" hidden>
+            <div id="smRefNone"><small>😊 <b>원본 2장 방식</b>: 미소 사진을 넣으면 미소에 어울리는 치아로 변환해요</small>
+              <button type="button" class="btn sm" id="smRefAdd">😊 미소 사진 넣기</button></div>
+            <div id="smRefHas">
+              <label><input type="checkbox" id="smRefOn"> 😊 미소 사진도 참고해서 변환 (원본 2장)</label>
+              <label><input type="checkbox" id="smRefAuto"> 변환 후 미소 사진에 자동으로 맞추기</label>
+            </div>
+          </div>
+        </details>
       </div>
       <small class="p-note convert-base" id="convertBase"></small>
       <button type="button" class="convert" id="convertBtn">✨ After 변환하기</button>
@@ -441,7 +441,7 @@
 </div>
 
 <script src="qrcode.min.js"></script>
-<script type="module" src="app.js?v=3.40"></script>
+<script type="module" src="app.js?v=3.41"></script>
 <div class="toast" id="toast" hidden></div>
 <div class="overlay" id="camOv" hidden role="dialog" aria-modal="true" aria-labelledby="camTitle">
   <div class="ov-card">

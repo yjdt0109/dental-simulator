@@ -317,6 +317,9 @@ function renderPanel(teeth, tx, view) {
   cb.classList.toggle('busy', busy);
   $('#convertBase').textContent = state.base ? `🔁 기준 사진: ${state.base} → 이 결과를 다듬어요 (원본으로 하려면 비교 목록에서 원본 클릭)` : '기준 사진: 원본 · 브리핑 비교 목록에서 변환 결과를 클릭하면 그 결과를 기준으로 다시 변환해요';
   $('#convertBase').classList.toggle('on', !!state.base);
+  // 지금 엔진 한 줄 (바꾸기는 ⚙ 고급)
+  const ENG = { a: '옵션 A · FLUX + 나노바나나 2.1', b: '옵션 B · FLUX + 나노바나나 Pro', c: '옵션 C · FLUX + Vertex AI', solo: '교정·단독 · 나노바나나 단독' };
+  $('#engineNow').textContent = !state.useAi ? '엔진: AI 꺼짐 (기본 미백 방식) · 켜기는 ⚙ 고급' : `엔진: ${ENG[state.engineEff || state.engine] || '-'}${state.engineNote ? ' · ' + state.engineNote : ''} · 바꾸기는 ⚙ 고급`;
   // 💾 저장 버튼 · PC 폴더 저장 상태
   $('#saveBtn').disabled = !state.hasAfter || locked() || !!state.converting;
   $('#saveBtn').textContent = locked() ? '✓ 저장·상담 완료됨' : '💾 저장 및 상담 완료';

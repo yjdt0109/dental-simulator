@@ -121,6 +121,24 @@ void main() {
     await t.tap(find.text('다음: After 만들기'));
     await _settle(t);
     expect(find.text('4. After 만들기'), findsOneWidget);
+    expect(find.text('✨ After 만들기'), findsOneWidget); // 간단한 4단계
+    expect(find.text('AI 시뮬레이션 엔진'), findsNothing); // 엔진 목록은 ⚙ 고급에
+    // ⚙ 고급 열고 닫기
+    await t.tap(find.text('⚙ 고급'));
+    await _settle(t);
+    expect(find.text('⚙ 고급 설정'), findsOneWidget);
+    expect(find.text('🔑 API 키 · 모델 설정'), findsOneWidget);
+    await t.tap(find.text('닫고 4단계로'));
+    await _settle(t);
+    expect(find.text('⚙ 고급 설정'), findsNothing);
+    // 위쪽: 자동 QA·보관함 버튼은 없고 🧪 전문가 메뉴 안에
+    expect(find.text('🤖 자동 QA'), findsNothing);
+    await t.tap(find.byTooltip('🧪 전문가'));
+    await _settle(t);
+    expect(find.text('🤖 자동 QA'), findsOneWidget);
+    expect(find.text('예전 화면으로 (모든 기능)'), findsOneWidget);
+    await t.tapAt(const Offset(5, 450)); // 메뉴 닫기
+    await _settle(t);
     send({'t': 'convert'});
     await _settle(
       t,

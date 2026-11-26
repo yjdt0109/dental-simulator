@@ -455,3 +455,8 @@ table.rank td { padding: 8px; border-top: 1px solid var(--line); }
 .cam-view { background: #0d1622; border-radius: 12px; overflow: hidden; aspect-ratio: 4 / 3; display: grid; place-items: center; }
 .cam-view video, .cam-view img { width: 100%; height: 100%; object-fit: contain; }
 .cam-acts { display: flex; flex-wrap: wrap; gap: 8px; }
+
+/* v3.41 ⚙ 고급 접기 */
+.adv { border: 1px solid var(--line); border-radius: 12px; padding: 8px 12px; margin-top: 10px; background: #fff; }
+.adv > summary { cursor: pointer; font-weight: 800; color: var(--blue-deep); }
+.adv[open] { display: grid; gap: 8px; }
