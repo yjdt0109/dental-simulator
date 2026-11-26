@@ -435,3 +435,13 @@ table.rank td { padding: 8px; border-top: 1px solid var(--line); }
 .sm-afters button.on { border: 2px solid var(--blue); background: var(--blue-soft, #eef5fd); }
 .sm-afters img, .sm-afters i { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 5px; background: #eef1f5; display: block; }
 .sm-afters span { font-size: 11px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* v3.39 단계 표시줄 · 사진 돌리기 */
+.stepbar { flex: none; display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+.stepbar button { border: 1px solid var(--line); background: #fff; border-radius: 999px; padding: 6px 12px; font-weight: 800; font-size: 13px; color: var(--blue-deep); cursor: pointer; }
+.stepbar button.on { background: var(--blue); color: #fff; border-color: var(--blue); }
+.stepbar i { color: var(--muted); font-style: normal; }
+.slot { position: relative; }
+.slot .rots { display: flex; gap: 4px; margin-left: auto; flex: none; }
+.slot .rots i { font-style: normal; width: 28px; height: 28px; border-radius: 8px; border: 1px solid var(--line); display: grid; place-items: center; font-size: 16px; background: #fff; }
+.slot .rots i:hover { background: var(--blue-soft, #eef5fd); }

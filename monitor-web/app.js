@@ -109,7 +109,7 @@ function render() {
   const tabletView = state.view || 'edit';
   if (tabletView !== lastTabletView) { lastTabletView = tabletView; localView = null; }
   const items = Array.isArray(state.items) ? state.items.map(String) : ['원본'];
-  const subs = Array.isArray(state.subs) ? state.subs.map(String) : []; // 태블릿 2026.11.25-d 이상: 불러온 사진 설명
+  const subs = Array.isArray(state.subs) ? state.subs.map(String) : []; // 태블릿 2026.11.26-a 이상: 불러온 사진 설명
   const cmp = Array.isArray(state.cmp) ? state.cmp.filter((n) => Number.isInteger(n) && n < items.length) : [0];
   const hasAfterShown = tabletView !== 'edit' && images && images.after;
   // one: 비교 목록에서 1장만 고름 → 그 사진만 크게
@@ -325,7 +325,7 @@ function renderPanel(teeth, tx, view) {
       : pcDirState === 'on' ? `💾 저장하면 PC 폴더(${esc(pcDir.name)})에도 자동 저장돼요`
         : '⚠ PC 폴더 저장이 꺼져 있어요 · <a href="#" id="savePick">📁 PC 저장 폴더 고르기</a>';
   }
-  // 😊 원본 2장 (태블릿 2026.11.25-d 이상)
+  // 😊 원본 2장 (태블릿 2026.11.26-a 이상)
   const sr = state.smileRef;
   $('#smRef').hidden = !sr || locked();
   if (sr) {
@@ -950,7 +950,7 @@ function renderQa() {
   const running = !!q.running;
   const newApp = !!qa;
   const warn = !qaConnected() ? '태블릿이 연결되어 있지 않습니다. QR 로 연결해 주세요.'
-    : !newApp ? '태블릿 앱을 최신 버전(2026.11.25-d 이상)으로 업데이트해야 자동 QA 를 PC 에서 쓸 수 있습니다.'
+    : !newApp ? '태블릿 앱을 최신 버전(2026.11.26-a 이상)으로 업데이트해야 자동 QA 를 PC 에서 쓸 수 있습니다.'
     : !(images && images.before) ? '태블릿에서 환자 사진을 먼저 올려 주세요 (PC 의 [사진 올리기] 도 가능).'
     : q.ready === false ? '태블릿의 AI 연결이 준비되지 않았습니다 (태블릿 [API 키 설정] 확인).' : '';
   $('#qaWarn').hidden = !warn; $('#qaWarn').textContent = warn;
@@ -1074,7 +1074,7 @@ function renderArchive() {
   const a = archive;
   if (!qaConnected() || !a) {
     setHtml($('#archFolders'), '');
-    setHtml($('#archGrid'), `<p class="empty">${!qaConnected() ? '태블릿을 연결하면 태블릿에 저장된 보관함이 보입니다.' : '보관함이 비어 있거나, 태블릿 앱 업데이트(2026.11.25-d 이상)가 필요합니다.'}</p>`);
+    setHtml($('#archGrid'), `<p class="empty">${!qaConnected() ? '태블릿을 연결하면 태블릿에 저장된 보관함이 보입니다.' : '보관함이 비어 있거나, 태블릿 앱 업데이트(2026.11.26-a 이상)가 필요합니다.'}</p>`);
     return;
   }
   const folders = a.folders || [];
@@ -1191,7 +1191,7 @@ function renderRecords() {
   if ($('#recOv').hidden) return;
   if (!qaConnected() || !records) {
     setHtml($('#recTx'), ''); $('#recCount').textContent = '';
-    setHtml($('#recTree'), `<p class="empty">${!qaConnected() ? '태블릿을 연결하면 태블릿에 저장된 환자 기록이 보입니다.' : '아직 저장된 기록이 없거나, 태블릿 앱 업데이트(2026.11.25-d 이상)가 필요합니다.'}</p>`);
+    setHtml($('#recTree'), `<p class="empty">${!qaConnected() ? '태블릿을 연결하면 태블릿에 저장된 환자 기록이 보입니다.' : '아직 저장된 기록이 없거나, 태블릿 앱 업데이트(2026.11.26-a 이상)가 필요합니다.'}</p>`);
     return;
   }
   setHtml($('#recTx'), TX_ALL.map((t) => `<button type="button" data-tx="${esc(t)}" class="${recTx === t ? 'on' : ''}" aria-pressed="${recTx === t}">${esc(t)}</button>`).join(''));
@@ -1335,7 +1335,7 @@ function rzZoomAt(fx, fy, ns) {
 }
 function renderRz(view) {
   const rz = state && state.rz;
-  // 크기 조절: 왼쪽 목록에서 고른 사진 (원본 1·2 제외 · After·미소 결과 모두) — 태블릿 2026.11.25-d 이상은 rzOk
+  // 크기 조절: 왼쪽 목록에서 고른 사진 (원본 1·2 제외 · After·미소 결과 모두) — 태블릿 2026.11.26-a 이상은 rzOk
   const rzOk = state && state.rzOk !== undefined ? !!state.rzOk : !!(state && state.hasAfter) && view !== 'edit';
   const canOpen = !!state && state.useAi && rzOk && !locked() && !rz && Number(state.v) >= 6 && state.samOn !== undefined;
   if (state && state.rzOf) $('#rzOpen').title = `🦷 [${state.rzOf}] 사진의 치아를 클릭해 키우거나 줄여요 (왼쪽 목록에서 다른 사진을 누르면 그 사진으로)`;
@@ -1485,14 +1485,14 @@ function renderSmile(view) {
   $('#smMake').textContent = sm.busy ? '⏳ 처리 중…' : sm.made ? '😊 다시 입히기' : '😊 미소에 입히기';
   $('#smHint').textContent = !sm.has ? '사진을 올리면 입술 사이 치아를 자동으로 찾아요' : sm.n > 0 ? `치아 영역 ${sm.n}개 선택됨` : '🪄 미소 사진 속 치아를 클릭해 고르세요';
   $('#smMsg').textContent = sm.msg || '';
-  // 🦷 보철 사진 정밀 매칭 (태블릿 앱 2026.11.25-d 이상)
+  // 🦷 보철 사진 정밀 매칭 (태블릿 앱 2026.11.26-a 이상)
   $('#smMatch').hidden = !mm;
   if (mm) {
     const busy = !!mm.busy;
     $('#smP2After').disabled = busy || !state.hasAfter;
     $('#smP2After').title = state.hasAfter ? '지금 큰 화면의 변환 결과를 2번 사진으로 써요' : '변환 결과가 아직 없어요';
     $('#smMatchRun').disabled = busy || !mm.ok || !sm.has || !mm.has2;
-    // 오늘 만든 After 들 (태블릿 2026.11.25-d 이상)
+    // 오늘 만든 After 들 (태블릿 2026.11.26-a 이상)
     const afs = Array.isArray(mm.afters) ? mm.afters : [];
     const th = (smileData && smileData.aft) || {};
     $('#smAftersWrap').hidden = !afs.length;
@@ -1562,7 +1562,23 @@ $('#smP2File').addEventListener('change', (e) => sendPhoto(e, 'matchPhoto', '#sm
 // 🖼 원본 2슬롯 (v3.35): 원본 1 미소 · 원본 2 개구기 · 변환할 사진 고르기 · 2단계 최종 미소
 // =============================================================================
 let slotImg = {}, slotUploadTo = 0, slotReqAt = 0;
+const STEPS = ['사진', '치아 고르기', '치료 정하기', 'After 만들기', '다듬기', 'Final Smile', '저장'];
+function renderStepBar() {
+  const ui = state && state.ui, el = $('#stepBar');
+  el.hidden = !ui || !ui.new || !!state.briefing;
+  if (el.hidden) return;
+  const key = ui.step + '|' + locked();
+  if (el.dataset.key === key) return;
+  el.dataset.key = key;
+  el.innerHTML = STEPS.map((s, i) => `<button type="button" data-step="${i + 1}" class="${ui.step === i + 1 ? 'on' : ''}">${i + 1} ${s}</button>`).join('<i>›</i>');
+}
+$('#stepBar').addEventListener('click', (e) => { const b = e.target.closest('[data-step]'); if (b) cmd('step', Number(b.dataset.step)); });
+$('#newCaseBtn').addEventListener('click', () => {
+  if (state && state.hasAfter && !locked() && !confirm('지금 작업을 아직 저장하지 않았어요 (저장하지 않으면 환자 기록에 남지 않아요).\n새 작업을 시작할까요?')) return;
+  cmd('newCase');
+});
 function renderSlots() {
+  renderStepBar();
   const bar = $('#slotBar'); if (!bar) return;
   const sl = state && state.slots;
   bar.hidden = !sl || !!state.briefing || locked();
@@ -1589,6 +1605,8 @@ function renderSlots() {
 $('#slotBar').addEventListener('click', (e) => {
   const b = e.target.closest('.slot'); if (!b || b.disabled || !state || !state.slots) return;
   const k = Number(b.dataset.slot);
+  const rot = e.target.closest('[data-rot]');
+  if (rot) { if (state.slots['s' + k]) cmd('slotRotate', { s: k, d: Number(rot.dataset.rot) }); return; } // ⟲ ⟳ 사진 돌리기
   if (!state.slots['s' + k]) { slotUploadTo = k; $('#slotFile').click(); return; }
   cmd('slotSelect', k);
 });

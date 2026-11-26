@@ -48,10 +48,15 @@ import 'sample_photos.dart';
 import 'sim_models.dart';
 import 'whitening.dart';
 
+part 'step_flow.dart';
+
 /// 치과 상담실 전용 비포&애프터 시뮬레이터 메인 화면
 /// - 사진: 비교 화면 위 [환자 사진 등록] (카메라 촬영 · 갤러리 선택)
 /// - 중앙: 영역 지정 → (변환 후) 일반 화면 위아래 비교 / 브리핑 모드 슬라이더 비교
 /// - 우측: 상담 가이드 (치료 항목, 덴탈 차트, 셰이드, After 변환, 상담 완료)
+/// 테스트용: true 면 예전 화면으로 시작 (기존 테스트들은 예전 화면 기준)
+bool debugStepFlowOff = false;
+
 class SimulatorHomeScreen extends StatefulWidget {
   const SimulatorHomeScreen({
     super.key,
@@ -89,6 +94,21 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
   PatientPhoto? _cur;
   double _pos = 0.5;
   bool _briefing = false;
+
+  // 🆕 단계형 새 화면 (기본). [예전 화면] 으로 바꿀 수 있음
+  bool _newUi = !debugStepFlowOff;
+  int _step = 1;
+  static const _prefNewUi = 'ui.stepFlow';
+  static const _prefEngineB = 'ui.stepFlow.engineB';
+  void _ss(VoidCallback fn) => setState(fn);
+
+  void _toggleUi() {
+    setState(() => _newUi = !_newUi);
+    SharedPreferences.getInstance()
+        .then((pr) => pr.setBool(_prefNewUi, _newUi))
+        .ignore();
+  }
+
   BoxFit _fit = BoxFit.cover;
   bool _converting = false;
   int _uploadSeq = 0;
@@ -101,6 +121,15 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
     SharedPreferences.getInstance().then((pr) {
       final v = pr.getBool(_prefEyeMask);
       if (v != null && mounted) setState(() => _eyeMask = v);
+      final u = pr.getBool(_prefNewUi);
+      if (u != null && mounted && !debugStepFlowOff) {
+        setState(() => _newUi = u);
+      }
+      // 새 화면 첫 사용: 기본 엔진을 옵션 B 로 (한 번만, 이후엔 사용자가 고른 대로)
+      if (pr.getBool(_prefEngineB) != true) {
+        pr.setBool(_prefEngineB, true).ignore();
+        PipelineSettings.instance.setEngine(Engine.b).ignore();
+      }
     }).ignore();
     _loadSamples();
     if (widget.openRecords) {
@@ -226,6 +255,7 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
         final n = _rzTargetOf(p);
         return n == null ? '' : _label(p, n);
       })(),
+      'ui': {'new': _newUi, 'step': _step, 'blank': p.blank},
       'slots': {
         'cur': p.slot,
         's1': _slot1Bytes(p) != null,
@@ -1266,6 +1296,19 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
         _smileRemoteMake(p);
       case 'smileView':
         setState(() => _smileView = v == true && p.smileAfter != null);
+      case 'slotRotate': // PC 원본 사진 돌리기 {s, d}
+        if (v is Map && (v['s'] == 1 || v['s'] == 2) && v['d'] is int) {
+          _rotateSlot(
+            p,
+            v['s'] as int,
+            (v['d'] as int) >= 0 ? 1 : -1,
+            ask: false,
+          );
+        }
+      case 'newCase': // PC ＋ 새 작업
+        _newCase();
+      case 'step': // PC 단계 이동
+        if (v is int && v >= 1 && v <= 7) _goStep(v);
       case 'slotSelect': // PC 변환할 원본 고르기 (1 미소 / 2 개구기)
         if (v == 1 || v == 2) _slotSelect(p, v as int);
       case 'slotPhoto': // PC 원본 슬롯에 사진 올리기 {s, b}
@@ -1857,6 +1900,7 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
               : LayoutBuilder(
                   builder: (context, c) {
                     final wide = c.maxWidth >= 1100 && c.maxHeight >= 600;
+                    if (_newUi && !_briefing) return _stepLayout(wide, c);
                     return wide ? _wideLayout() : _narrowLayout(c);
                   },
                 ),
@@ -1999,6 +2043,22 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
         ],
       ),
       actions: [
+        if (!narrow)
+          _barButton(
+            Icons.add_box_outlined,
+            '＋ 새 작업',
+            phone,
+            _cur == null ? null : _newCase,
+          ),
+        if (!narrow)
+          IconButton(
+            tooltip: _newUi ? '예전 화면으로 (모든 기능)' : '새 단계 화면으로',
+            onPressed: _toggleUi,
+            icon: Icon(
+              _newUi ? Icons.view_quilt_outlined : Icons.linear_scale_rounded,
+              color: AppColors.blue,
+            ),
+          ),
         CastButton(iconOnly: phone),
         if (_pro)
           _barButton(
@@ -2028,11 +2088,27 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
             color: Colors.white,
             surfaceTintColor: Colors.transparent,
             onSelected: (v) => switch (v) {
+              'new' => _cur == null ? null : _newCase(),
+              'ui' => _toggleUi(),
               'archive' => _openArchive(),
               'reset' => _cur == null ? null : _resetConsult(),
               _ => _logout(),
             },
             itemBuilder: (_) => [
+              const PopupMenuItem(
+                value: 'new',
+                child: ListTile(
+                  leading: Icon(Icons.add_box_outlined),
+                  title: Text('＋ 새 작업'),
+                ),
+              ),
+              PopupMenuItem(
+                value: 'ui',
+                child: ListTile(
+                  leading: const Icon(Icons.view_quilt_outlined),
+                  title: Text(_newUi ? '예전 화면으로' : '새 단계 화면으로'),
+                ),
+              ),
               if (_pro)
                 const PopupMenuItem(
                   value: 'archive',
@@ -2259,7 +2335,10 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
     }
     // 브리핑 모드: 왼쪽에 원본 + 변환 결과 목록 (체크해서 비교할 사진 고르기)
     // 왼쪽 '비교할 사진' 목록: 브리핑이 아닐 때도 (불러온 사진 확인·고르기) — 폰처럼 좁으면 브리핑에서만
-    if (_briefing || MediaQuery.sizeOf(context).width >= 700) {
+    final listOn = _newUi
+        ? (_briefing || (_step >= 4 && MediaQuery.sizeOf(context).width >= 700))
+        : (_briefing || MediaQuery.sizeOf(context).width >= 700);
+    if (listOn) {
       stage = Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -2324,7 +2403,10 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
         children: [
           _viewerHead(p, mode),
           const SizedBox(height: 10),
-          if (!_briefing) ...[_slotBar(p), const SizedBox(height: 10)],
+          if (!_briefing && !_newUi) ...[
+            _slotBar(p),
+            const SizedBox(height: 10),
+          ],
           if (fill)
             Expanded(child: stage)
           else
@@ -2337,8 +2419,10 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
               howto,
               style: const TextStyle(fontSize: 12, color: AppColors.gray500),
             ),
-          if (!_briefing && _useAi) _guideCheck(p),
-          if (mode != _ViewMode.edit && (_converted || _rzTargetOf(p) != null))
+          if (!_briefing && _useAi && !_newUi) _guideCheck(p),
+          if (!_newUi &&
+              mode != _ViewMode.edit &&
+              (_converted || _rzTargetOf(p) != null))
             _resultTools(p),
         ],
       ),
@@ -3266,20 +3350,22 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
                   if (label != null) _toast('↷ \'$label\' 상태로 다시 돌아갔습니다.');
                 }),
               ),
-            _headButton(
-              Icons.photo_camera_outlined,
-              '환자 사진 등록',
-              phone,
-              _choosePhoto,
-            ),
+            if (!_newUi)
+              _headButton(
+                Icons.photo_camera_outlined,
+                '환자 사진 등록',
+                phone,
+                _choosePhoto,
+              ),
             // 변환하기 전에도: 예전에 변환했던 기록 불러오기 · 미소 미리보기
-            _headButton(
-              Icons.history_rounded,
-              '이전 변환 불러오기',
-              phone,
-              _openRecords,
-            ),
-            if (!_briefing)
+            if (!_newUi)
+              _headButton(
+                Icons.history_rounded,
+                '이전 변환 불러오기',
+                phone,
+                _openRecords,
+              ),
+            if (!_briefing && !_newUi)
               _headButton(
                 Icons.sentiment_very_satisfied_outlined,
                 p.smile == null ? '😊 미소 미리보기' : '😊 미소 미리보기 다시',
@@ -3408,7 +3494,11 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
   // ---------------------------------------------------------------------------
   // 3·4) 상담 가이드 패널
   // ---------------------------------------------------------------------------
-  Widget _panel({required bool scrollable}) {
+  /// 단계 화면에서 쓰는 패널 조각 (0 머리 · 1 이름 · 2 치료 항목 · 3 치료 부위 · 4 셰이드 · 5 변환 · 6 메모 · 7 저장 · 8 안내)
+  Widget _panelParts(bool locked, Set<int> only) =>
+      _panel(scrollable: false, only: only);
+
+  Widget _panel({required bool scrollable, Set<int>? only}) {
     final c = _c, locked = c.doneAt != null;
     final teeth = sortTeeth(c.teeth);
     final children = <Widget>[
@@ -3617,15 +3707,22 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
         ],
       ),
     ];
+    final shown = only == null
+        ? children
+        : [
+            for (var i = 0; i < children.length; i++)
+              if (only.contains(i)) children[i],
+          ];
     final body = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        for (var i = 0; i < children.length; i++) ...[
+        for (var i = 0; i < shown.length; i++) ...[
           if (i > 0) const SizedBox(height: 18),
-          children[i],
+          shown[i],
         ],
       ],
     );
+    if (only != null) return body;
     return _card(
       padding: const EdgeInsets.all(18),
       child: scrollable ? SingleChildScrollView(child: body) : body,
@@ -3970,8 +4067,10 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
   }
 
   // ── 🖼 원본 2슬롯: 원본 1(자연스러운 미소) · 원본 2(개구기) ─────────────
-  PatientPhoto? _slotPhoto(PatientPhoto p, int k) =>
-      p.slot == k ? p : (p.pair?.slot == k ? p.pair : null);
+  PatientPhoto? _slotPhoto(PatientPhoto p, int k) {
+    final q = p.slot == k ? p : (p.pair?.slot == k ? p.pair : null);
+    return q == null || q.blank ? null : q;
+  }
 
   /// 원본 1(미소) 사진: 슬롯 1 사진, 없으면 미소 미리보기에 넣은 미소 사진
   Uint8List? _slot1Bytes(PatientPhoto p) =>
@@ -4042,16 +4141,19 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
     int k,
     Uint8List bytes, {
     bool fromPc = false,
+    bool mask = true, // 돌리기처럼 이미 가린 사진이면 false
+    String? note,
   }) async {
-    var data = bytes;
-    if (k == 2 && _eyeMask && EyeMasker.supported) {
+    // 옆으로 누운 사진(EXIF 방향)은 바로 세움
+    var data = await compute(normalizeOrientation, bytes);
+    if (mask && k == 2 && _eyeMask && EyeMasker.supported) {
       try {
         data = await EyeMasker.mask(bytes) ?? bytes; // 개구기 사진만 눈 가리기
       } catch (e) {
         debugPrint('eye mask: $e');
       }
     }
-    final old = _slotPhoto(p, k);
+    final old = _slotPhoto(p, k) ?? (p.blank && p.slot == k ? p : null);
     final other = _slotPhoto(p, k == 1 ? 2 : 1);
     final np = await _makeSlotPhoto(data, k, p.consult);
     if (!mounted) return;
@@ -4071,16 +4173,88 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
       await setSmile(np, other.beforeBytes);
     }
     if (!mounted) return;
-    if (identical(old, p)) {
-      _select(np); // 지금 보던 슬롯을 바꿨거나 예시 사진 화면이면 새 사진으로
+    if (identical(old, p) || p.blank) {
+      // 지금 보던 슬롯을 바꿨거나 [새 작업] 빈 자리면 새 사진으로
+      if (p.blank && !identical(old, p)) _patients.remove(p);
+      _select(np);
     } else {
       setState(() {});
     }
     _smilePublish(_cur!);
     _toast(
-      '${fromPc ? 'PC에서 ' : ''}원본 $k(${k == 1 ? '자연스러운 미소' : '개구기'}) 사진을 넣었습니다'
-      '${identical(_cur, np) ? '' : ' · 위 카드를 누르면 그 사진을 변환할 수 있어요'}',
+      note ??
+          '${fromPc ? 'PC에서 ' : ''}원본 $k(${k == 1 ? '자연스러운 미소' : '개구기'}) 사진을 넣었습니다'
+              '${identical(_cur, np) ? '' : ' · 카드를 누르면 그 사진을 변환할 수 있어요'}',
     );
+  }
+
+  /// ⟳ 원본 사진 돌리기 (옆으로 누운 사진) — 그 사진의 After·치아 선택은 새로 해야 함
+  Future<void> _rotateSlot(
+    PatientPhoto p,
+    int k,
+    int turns, {
+    bool ask = true,
+  }) async {
+    final q = _slotPhoto(p, k);
+    if (q == null || _converting) return;
+    if (ask && (q.results.isNotEmpty || q.sam.isNotEmpty)) {
+      final ok = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          backgroundColor: Colors.white,
+          title: const Text('사진을 돌릴까요?'),
+          content: const Text(
+            '돌리면 이 사진으로 만든 After와 고른 치아가 지워져요. 돌린 뒤 다시 만들어 주세요.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('취소'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('돌리기'),
+            ),
+          ],
+        ),
+      );
+      if (ok != true || !mounted) return;
+    }
+    final r = await compute((a) => rotatePhoto(a.$1, a.$2), (
+      q.beforeBytes,
+      turns,
+    ));
+    if (!mounted) return;
+    await _setSlot(
+      p,
+      k,
+      r,
+      mask: false,
+      note: '원본 $k 사진을 ${turns > 0 ? '오른쪽' : '왼쪽'}으로 돌렸습니다',
+    );
+  }
+
+  /// ＋ 새 작업: 지금 작업은 그대로 두고(저장했으면 기록에 있음) 빈 자리에서 새 환자 시작
+  void _newCase() {
+    _uploadSeq++;
+    final p = PatientPhoto(
+      id: 'u$_uploadSeq',
+      name: '새 환자 $_uploadSeq',
+      type: '새 작업',
+      time: '방금',
+      beforeBytes: blankPhoto(),
+      imageSize: const Size(640, 480),
+    )..blank = true;
+    p.consult.name = '';
+    _patients.insert(0, p);
+    _select(p);
+    setState(() {
+      _step = 1;
+      _finalMsg = '';
+      _smileMsg = '';
+      _drawLines = false;
+    });
+    _toast('＋ 새 작업을 시작합니다 · 원본 2(개구기) 사진부터 넣어 주세요');
   }
 
   /// 변환할 원본 고르기

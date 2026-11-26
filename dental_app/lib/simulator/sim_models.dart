@@ -195,6 +195,9 @@ class PatientPhoto {
   /// 같은 환자의 다른 슬롯 사진 (원본 1 ↔ 원본 2). 상담 내용(Consult)은 함께 씀
   PatientPhoto? pair;
 
+  /// [＋ 새 작업] 으로 만든 빈 자리 (아직 사진 없음)
+  bool blank = false;
+
   final String id;
   final String name;
   final String type;
@@ -510,3 +513,33 @@ class Consult {
   final DateTime date = DateTime.now(); // 상담 날짜 (상담을 시작한 날)
   DateTime? doneAt;
 }
+
+/// 사진의 EXIF 방향(옆으로 누운 사진)을 실제 픽셀로 바로 세움. 바꿀 게 없으면 그대로 돌려줌
+Uint8List normalizeOrientation(Uint8List bytes) {
+  try {
+    final im = img.decodeJpg(bytes);
+    if (im == null) return bytes;
+    final o = im.exif.imageIfd.orientation;
+    if (o == null || o == 1) return bytes;
+    final baked = img.bakeOrientation(im);
+    return Uint8List.fromList(img.encodeJpg(baked, quality: 92));
+  } catch (_) {
+    return bytes;
+  }
+}
+
+/// 사진을 90° 돌림 ([turns] 1 = 오른쪽(시계 방향), -1 = 왼쪽)
+Uint8List rotatePhoto(Uint8List bytes, int turns) {
+  final im = img.decodeImage(bytes);
+  if (im == null) return bytes;
+  final r = img.copyRotate(img.bakeOrientation(im), angle: 90 * turns);
+  return Uint8List.fromList(img.encodeJpg(r, quality: 92));
+}
+
+/// 빈 자리용 회색 사진
+Uint8List blankPhoto() => Uint8List.fromList(
+  img.encodeJpg(
+    img.Image(width: 640, height: 480)..clear(img.ColorRgb8(226, 230, 236)),
+    quality: 80,
+  ),
+);
