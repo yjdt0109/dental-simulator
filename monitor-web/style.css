@@ -460,3 +460,8 @@ table.rank td { padding: 8px; border-top: 1px solid var(--line); }
 .adv { border: 1px solid var(--line); border-radius: 12px; padding: 8px 12px; margin-top: 10px; background: #fff; }
 .adv > summary { cursor: pointer; font-weight: 800; color: var(--blue-deep); }
 .adv[open] { display: grid; gap: 8px; }
+
+/* v3.42 목록 사진 → 원본 ①② */
+.pick-to { position: absolute; left: 4px; top: 4px; display: flex; gap: 3px; }
+.pick-to i { font-style: normal; width: 24px; height: 22px; border-radius: 6px; background: rgba(13,90,170,.85); color: #fff; font-size: 13px; font-weight: 800; display: grid; place-items: center; }
+.pick-to i:hover { background: #0a4a8c; }

@@ -1297,6 +1297,21 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
         _smileRemoteMake(p);
       case 'smileView':
         setState(() => _smileView = v == true && p.smileAfter != null);
+      case 'slotFromList': // PC 왼쪽 목록의 사진을 원본 1·2 로 {s, n(목록 위치)}
+        if (v is Map &&
+            (v['s'] == 1 || v['s'] == 2) &&
+            v['n'] is int &&
+            (v['n'] as int) >= 0 &&
+            (v['n'] as int) < p.listOrder.length) {
+          final n = p.listOrder[v['n'] as int];
+          _setSlot(
+            p,
+            v['s'] as int,
+            p.bytesOf(n),
+            note:
+                '\'${_label(p, n)}\' 사진을 원본 ${v['s']}(${v['s'] == 1 ? '자연스러운 미소' : '개구기'})로 넣었습니다',
+          );
+        }
       case 'slotRotate': // PC 원본 사진 돌리기 {s, d}
         if (v is Map && (v['s'] == 1 || v['s'] == 2) && v['d'] is int) {
           _rotateSlot(
@@ -4303,6 +4318,14 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
                     title: const Text('갤러리에서 고르기'),
                     onTap: () => Navigator.pop(ctx, ImageSource.gallery),
                   ),
+                  ListTile(
+                    leading: const Icon(Icons.folder_open_outlined),
+                    title: const Text('🗂 환자 기록에서'),
+                    onTap: () {
+                      Navigator.pop(ctx);
+                      _slotFromRecords(p, k);
+                    },
+                  ),
                   const SizedBox(height: 8),
                 ],
               ),
@@ -4322,6 +4345,18 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
     } catch (e) {
       _toast('사진을 불러오지 못했습니다. 카메라·사진 권한을 확인해 주세요.');
     }
+  }
+
+  /// 🗂 환자 기록의 사진 한 장을 원본 1·2 로
+  Future<void> _slotFromRecords(PatientPhoto p, int k) async {
+    final got = await pickRecordPhotos(context, smileFirst: k == 1);
+    if (got == null || got.isEmpty || !mounted) return;
+    await _setSlot(
+      p,
+      k,
+      got.first.bytes,
+      note: '환자 기록의 \'${got.first.label}\' 을(를) 원본 $k 로 넣었습니다',
+    );
   }
 
   /// 2단계: 원본 1 + After → fal.ai 나노바나나 → Final Smile

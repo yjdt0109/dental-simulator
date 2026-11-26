@@ -181,4 +181,35 @@ void main() {
     }
     expect(t.takeException(), isNull);
   });
+
+  testWidgets('🆕 PC 왼쪽 목록의 사진을 원본 1 로 넣기', (t) async {
+    debugStepFlowOff = false;
+    addTearDown(() => debugStepFlowOff = true);
+    t.view.physicalSize = const Size(1440, 900);
+    t.view.devicePixelRatio = 1;
+    addTearDown(t.view.reset);
+    await t.pumpWidget(
+      MaterialApp(
+        theme: buildTheme(),
+        home: const SimulatorHomeScreen(profile: _profile),
+      ),
+    );
+    await _settle(t, until: () => find.byType(RoiEditor).evaluate().isNotEmpty);
+    expect(find.text('눌러서 사진 넣기 (촬영·갤러리)'), findsOneWidget); // 원본 1 비어 있음
+    await t.runAsync(() async {
+      CastService.instance.onRemoteCmd!({
+        't': 'extraPhoto',
+        'v': base64Encode(jpg(150, w: 160, h: 120)),
+      });
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+      CastService.instance.onRemoteCmd!({
+        't': 'slotFromList',
+        'v': {'s': 1, 'n': 1},
+      });
+      await Future<void>.delayed(const Duration(milliseconds: 900));
+    });
+    await _settle(t);
+    expect(find.text('눌러서 사진 넣기 (촬영·갤러리)'), findsNothing); // 원본 1 채워짐
+    expect(t.takeException(), isNull);
+  });
 }

@@ -4,9 +4,9 @@
 > "HANDOFF.md 읽고 이어서 작업해줘"라고 하면 됩니다. 답변은 항상 한글로.
 
 ## 1. 현재 버전
-- 태블릿 앱(안드로이드 APK, Flutter): **2026.11.26-b** (`lib/cast/cast_service.dart`의 `appVersion`)
-- 상담 PC 모니터(웹, Netlify에 폴더째 끌어다 놓기): **v3.41** (`monitor-web/`)
-- 자동 테스트: 150개 모두 통과 (`flutter test`)
+- 태블릿 앱(안드로이드 APK, Flutter): **2026.11.26-c** (`lib/cast/cast_service.dart`의 `appVersion`)
+- 상담 PC 모니터(웹, Netlify에 폴더째 끌어다 놓기): **v3.42** (`monitor-web/`)
+- 자동 테스트: 151개 모두 통과 (`flutter test`)
 
 ## 2. 구성
 - `dental_app/` — Flutter 앱 (lib, test, android, web)
@@ -27,7 +27,7 @@
 9. **🦷 보철 사진 정밀 매칭** (😊 미소 미리보기 화면 안): 1번 자연 미소 + 2번 개구기 보철 사진 → MediaPipe 얼굴 특징점(눈동자·코끝, 눈 가린 사진은 코 기준)으로 2번을 1번에 맞춤(Kotlin `DentalAlignmentHelper.kt`, 채널 `bna/dental_align`) → 입술 안쪽 마스크·보철 치아만 잘라 합성 → FLUX Fill(빈 곳만) → 나노바나나 Pro 리터칭(실패 시 2.1) → 입술·얼굴 원본 고정. Dart: `lib/ai/smile_match.dart`. APK 127MB(모델 3.8MB 포함). **실제 기기·실제 AI로는 아직 시험 안 함**. PC(v3.25)에서도 😊 미소 미리보기 창 아래 칸에서 2번 올리기/지금 결과 쓰기/시작, ①②③ 단계 탭, [이 사진을 미소 비교에 쓰기] (명령: matchPhoto·matchUseAfter·matchRun·matchPick, 계산은 태블릿)
 10. **비교 목록 정리 (2026.11.19-e)**: 첫 화면(변환 전)에도 [이전 변환 불러오기](환자 기록) · [😊 미소 미리보기] 버튼. 미소 미리보기는 변환 전에도 열림(보철 정밀 매칭 가능), 환자 기록 화면에서는 미소 버튼 뺌. 미소 사진은 갤러리 여러 장 / 🗂 환자 기록에서 여러 장(누른 차례) / PC 여러 장·기록에서 불러오기(`smileFromRec`). 불러온 사진은 모두 `PatientPhoto.extras`(번호 -1, -2 …)로 브리핑 왼쪽 '비교할 사진' 목록 끝에 차례대로 + [사진 추가]. 브리핑에서는 변환 전이라도 목록에서 1~2장 골라 비교. PC 에는 목록 위치 번호(items/subs/cmp)로 보냄
 11. **기록 사진 한 장씩 불러오기 (2026.11.19-f)**: 기록 상세(태블릿·PC)의 사진마다 [이 사진만 불러오기] → 그 기록의 환자(없으면 원본만으로 만듦)에 원본/결과/미소/미소 미리보기를 한 장씩 차례대로 (`RecordPhotoLoader`, PC 명령 `recPhoto {id,f}`). 기존 버튼은 [시뮬레이터로 모두 불러오기]. 홈(시작 화면)에 [🗂 시뮬레이터 불러오기] 카드 → 시뮬레이터를 열며 바로 환자 기록 목록
-12. **2026.11.26-b**: 기록 상세의 [시뮬레이터로 모두 불러오기] 없앰(태블릿·PC) → 사진마다 [이 사진만 불러오기]만. 불러온 사진은 **지금 화면 환자**의 비교 목록 끝에 (예시 사진 화면이면 그 기록 환자를 만듦, 같은 기록 환자면 결과→결과·미소→미소). 브리핑 목록 항목마다 ✕(목록에서 빼기, 원본 제외, 결과는 [이전으로] 가능, PC `cmpRemove`). 브리핑은 항상 목록 표시, [기록·사진 추가]. PC 목록 아래 [🗂 기록 사진]·[📷 사진 올리기](`extraPhoto`)
+12. **2026.11.26-c**: 기록 상세의 [시뮬레이터로 모두 불러오기] 없앰(태블릿·PC) → 사진마다 [이 사진만 불러오기]만. 불러온 사진은 **지금 화면 환자**의 비교 목록 끝에 (예시 사진 화면이면 그 기록 환자를 만듦, 같은 기록 환자면 결과→결과·미소→미소). 브리핑 목록 항목마다 ✕(목록에서 빼기, 원본 제외, 결과는 [이전으로] 가능, PC `cmpRemove`). 브리핑은 항상 목록 표시, [기록·사진 추가]. PC 목록 아래 [🗂 기록 사진]·[📷 사진 올리기](`extraPhoto`)
 13. **2026.11.19-h / PC v3.30**: 태블릿 알림(_toast)을 PC 에도 띄움(state `notice`), PC 첫 화면에도 [🗂 기록 사진 불러오기], PC 비교 목록의 [기록 사진]·[사진 올리기]를 목록 위로(왼쪽 아래 버튼과 겹침 해결), PC 🪄 자동 선택 도구를 사진 위 → 사진 아래 [🪄 탭 한 번 자동 선택으로 치아 고르기] 체크 칸 + 도구 줄로 이동 (태블릿은 아직 그대로)
 14. **2026.11.19-i / PC v3.31**: 🦷 치아 크기 조절에서 **줄이기**(−30% 까지, 무삭제는 불가). 줄어든 자리는 치아 바깥(절단끝→아래 입 안, 잇몸 쪽→위 잇몸)을 끌어와 채움 (`scaleToothMasked` 음수). **다시 변환 기준**: 예전엔 항상 원본(beforeBytes) → 이제 비교 목록에서 변환 결과를 누르면 그 결과가 기준(`PatientPhoto.basePick/baseIndex/baseBytes`), 결과 이름에 'N번 기준'. 변환 상자·PC 변환 버튼 위에 '기준 사진' 표시(state `base`)
 15. **😊 원본 2장 방식 (2026.11.23-a / PC v3.32)**: 원본 1 = 개구기 사진(메인), 원본 2 = 미소 사진(p.smile). 변환할 때 미소 사진을 참고 사진으로 나노바나나(2단계 A·B, 단독)에 함께 보냄(`smileRefs`, `kSmileRefPrompt`: 스마일 아크·정중선·비율). FLUX 1단계와 옵션 C(Vertex)는 사진 1장만 받아 참고 못 함. 변환 끝나면 자동으로 미소 사진에 정밀 매칭(`_matchAfterConvert` → `_matchRun`) → 최종 목표 = 미소 결과(미소 ↔ 미소 미리보기 비교 화면 + 목록). 변환 상자·PC 패널에 체크 2개(`smileRef`, `autoMatch` 명령, state `smileRef`). 결과 이름에 '미소 참고'
@@ -37,12 +37,13 @@
 19. **2026.11.25-b / PC v3.36**: PC [💾 저장 및 상담 완료] 버튼(확인 창 → 명령 `confirmSave` → 태블릿 `_confirm(ask:false)` → 환자 기록 → PC 폴더 자동 저장, 아래에 PC 폴더 저장 켜짐/꺼짐 + 폴더 고르기 링크). 결과 이름 'OOO After N'(엔진은 작은 글씨 'After · 단독'). '😊 미소 비교' 버튼 없앰(태블릿 칩·PC 버튼, 왼쪽 목록에서 비교). PC [치아 크기 조절]을 아래 버튼 줄로 옮겨 목록과 안 겹치게. 서비컬 라인·🪄 치아 고르기 체크 칸을 어느 화면에서나 보이게, 체크하면 원본 화면으로(`before`, `_toEditView`). PC 슬롯 카드 사진이 없으면 `slotImgReq` 로 다시 받음
 20. **2026.11.25-c / PC v3.37**: 치아 줄이기 잔상 제거(`scaleToothMasked`: 윤곽을 치아 크기 8%+3px 넓혀 덮고 그 바깥에서 배경을 끌어옴). 치아 크기 조절 대상 = 왼쪽 목록에서 마지막으로 누른 사진(`PatientPhoto.resizeTarget`: 원본·원본 1·미소 원본 제외, After·미소 미리보기·Final Smile·불러온 사진 가능). After 면 새 After, 다른 사진이면 '… · 크기조절' 로 목록에 추가(그 사진엔 치아 윤곽이 없으니 탭해서 고름). PC 는 state `rzOk`/`rzOf`
 21. **2026.11.25-d / PC v3.38**: 보철 사진 정밀 매칭의 2번을 **오늘 만든 After 목록**에서 고르기(`_afterChoices`: 이 사진·짝 사진의 After 전부 + '크기 조절'·After 붙은 사진). PC 미소 창 [오늘 만든 After에서 고르기] 썸네일(smileImg `aft`, 명령 `matchUseResult key`), 태블릿 미소 미리보기 화면에도 가로 목록(`afterChoices`)
-22. **2026.11.26-b**: 옵션 B 오류 수정 — Firebase 에 `gemini-3-pro-image-preview` 가 없음(Publisher model not found). `TwoPassPipeline.proFinish`: 설정 이름 → 후보(`gemini-3-pro-image` 등) 차례로 → 모두 없으면 fal.ai `nano-banana-pro/edit` 로(이후 계속 fal, `proViaFal`). PC 변경 없음(v3.38 그대로)
+22. **2026.11.26-c**: 옵션 B 오류 수정 — Firebase 에 `gemini-3-pro-image-preview` 가 없음(Publisher model not found). `TwoPassPipeline.proFinish`: 설정 이름 → 후보(`gemini-3-pro-image` 등) 차례로 → 모두 없으면 fal.ai `nano-banana-pro/edit` 로(이후 계속 fal, `proViaFal`). PC 변경 없음(v3.38 그대로)
 23. **2026.11.25-f ③② (치아 길이·형태·경계)**: ③ `marginLockedRegion`(tooth_select.dart): 🪄 고른 치아의 잇몸 쪽 경계만 고정, 절단 쪽 치아 길이 25%(가장 긴 곳 기준이라 깨진 치아도 채움) + 옆에 고른 치아가 있으면 틈까지 15% 열기 → FLUX 마스크·원본 복원 영역으로 사용. 라미네이트·올세라믹·임플란트·교정에 적용(무삭제는 기존 10% 길게, 미백은 윤곽 그대로). ② `align_fix.dart` `alignAiToSource`: AI 결과를 원본과 비교(160px 회색조, ±4% 크기·±5% 밀림, 바뀐 치아 영향 줄이게 차이 40에서 자름)해 3% 이상 나아질 때만 되돌림 → `_fullResult`(모든 전체 사진 AI 결과)에 적용
 24. **🆕 단계형 새 시뮬레이터 화면 (2026.11.26-a / PC v3.39)**: `lib/simulator/step_flow.dart` (simulator_screen.dart 의 part, extension `_StepFlow`). 위 단계 표시줄 ① 사진 ② 치아 고르기 ③ 치료 정하기 ④ After 만들기 ⑤ 다듬기 ⑥ Final Smile ⑦ 저장 + 오른쪽(폰은 아래) 지금 단계 패널 + [이전]/[다음]. 기능은 기존 것 재사용(`_convertBox`, `_panel(only:{…})` 조각, `_openResize`, `_finalSmile`, `_confirm`), 비교 목록은 4단계부터. 기본(새 화면), 위쪽 아이콘·더보기로 [예전 화면] 전환(pref `ui.stepFlow`). 새 화면 처음 쓸 때 엔진 기본을 옵션 B 로(한 번만). 테스트는 `test/flutter_test_config.dart` 에서 `debugStepFlowOff=true`(예전 화면 기준), 새 화면 테스트는 `step_flow_test.dart`. **사진 돌리기** ⟲⟳(`rotatePhoto`, 슬롯 사진 새로 만듦 → 그 사진 After·치아 선택 지워짐 경고) + 올릴 때 EXIF 방향 자동 바로 세우기(`normalizeOrientation`). **＋ 새 작업**(위쪽 버튼·7단계 끝·PC 머리 버튼): 빈 자리(`PatientPhoto.blank`) 로 1단계부터. PC: 단계 표시줄(명령 `step`), 카드 ⟲⟳(`slotRotate`), [＋ 새 작업](`newCase`, 저장 안 했으면 확인)
 25. **PC v3.40 (태블릿 변경 없음)**: 비교 목록 위 [기록 사진]·[사진 올리기]와 아래 [기록 사진 불러오기]를 **[📂 불러오기]** 하나로(메뉴: 💻 PC 파일에서 여러 장 → `extraPhoto` / 🗂 환자 기록에서 → 기록 창). 오른쪽 [PC에서 사진 올리기] → **[📷 사진 촬영]**(웹캠 getUserMedia, 카메라 여러 개면 고르기, 찍은 뒤 [원본 2로]/[원본 1로] → `slotPhoto`). 위쪽 [자동 QA]·[환자 기록]·[보관함]은 **🧪 전문가 모드** 체크(PC마다 localStorage `bna.expert`)일 때만 보임
 26. **고급·전문가 정리 (2026.11.26-b / PC v3.41)**: 새 화면 ④는 간단하게(`_step4`: 엔진 한 줄 · 기준 사진 · 추가 요청 · 큰 [✨ After 만들기]). **⚙ 고급** 패널(`_advancedPanel`, 오른쪽 패널을 바꿔 보여 줌 `_advOpen`): AI 켜기·엔진·자동 지시(`_aiRow`), 적용 강도, 미소 사진 참고, 서비컬 선, 원본 윤곽, 눈 가리기, 예전 미소 미리보기(정밀 매칭), API 키. **🧪 전문가** 메뉴(`_expertMenu`): 자동 QA·보관함(PRO), 예전 화면으로, 상담 초기화, 로그아웃. 새 화면 위쪽 버튼 = ＋ 새 작업 · 🗂 환자 기록 · PC 연결 · ⚙ 고급 · 🧪 전문가(`_stepActions`). PC: 오른쪽 패널에 '엔진: …' 한 줄 + 추가 요청만 보이고, AI 켜기·엔진 목록·자동 지시·강도·미소 참고는 [⚙ 고급] 접기(`#pcAdv`)
-27. **상담 PC**: 위 기능 대부분을 마우스로 (SAM, 기준점, 크기 조절, QA, 보관함, 기록, 미소)
+27. **원본 1·2 넣는 길 늘림 (2026.11.26-c / PC v3.42)**: PC 왼쪽 목록 사진마다 ①② 버튼 → 그 사진을 원본 1·2 로(명령 `slotFromList {s, n}`). PC 원본 카드에 📷(그 카드로 바로 촬영)·📁(PC 파일), 빈 카드 클릭 = 그 카드로 촬영. 태블릿 원본 카드 사진 넣기에 '🗂 환자 기록에서'(`_slotFromRecords`)
+28. **상담 PC**: 위 기능 대부분을 마우스로 (SAM, 기준점, 크기 조절, QA, 보관함, 기록, 미소)
 
 ## 4. 마지막 대화에서 논의 중이던 것 (다음 할 일)
 - ③·② 넣음(2026.11.25-f) → 사용자 실제 테스트 결과 대기. 남은 제안: ④ 일반 라미네이트·크라운에도 원하는 절단선 지정, 경계 자동 검사(차이 크면 재시도)
@@ -64,8 +65,8 @@ flutter pub get
 flutter test
 flutter build apk --release   # build/app/outputs/flutter-apk/app-release.apk
 ```
-- PC 모니터: `monitor-web` 폴더를 Netlify에 그대로 올림 (사용자에게는 `monitor-web-v3.xx.zip` 으로 묶어 전달). 새 버전 만들 때 index.html의 버전(3.41)을 올림
-- 버전 올리기: `lib/cast/cast_service.dart`의 `appVersion` + PC `app.js` 안의 "2026.11.26-a 이상" 문구
+- PC 모니터: `monitor-web` 폴더를 Netlify에 그대로 올림 (사용자에게는 `monitor-web-v3.xx.zip` 으로 묶어 전달). 새 버전 만들 때 index.html의 버전(3.42)을 올림
+- 버전 올리기: `lib/cast/cast_service.dart`의 `appVersion` + PC `app.js` 안의 "2026.11.26-c 이상" 문구
 
 ## 6. 주요 파일
 - `lib/simulator/simulator_screen.dart` — 메인 화면(변환·PC 명령 처리 `_onRemoteCmd`·상태 전송 `_pushCast`)
