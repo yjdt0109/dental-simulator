@@ -417,28 +417,6 @@ const pendingFlush = [];
   typed($('#pname'), 'name', (v) => (nameDirtyUntil = v));
   typed($('#aiReq'), 'aiReq', (v) => (reqDirtyUntil = v));
 
-  // PC 에서 사진 올리기 → 긴 변 2000px JPEG 로 줄여 태블릿에 보냄 (눈 가리기는 태블릿이 처리)
-  $('#fileInput').addEventListener('change', async (e) => {
-    const f = e.target.files && e.target.files[0];
-    e.target.value = '';
-    if (!f) return;
-    const st = $('#uploadSt');
-    try {
-      st.textContent = '사진을 태블릿으로 보내는 중…';
-      const bmp = await createImageBitmap(f, { imageOrientation: 'from-image' });
-      const k = Math.min(1, 2000 / Math.max(bmp.width, bmp.height));
-      const c = document.createElement('canvas');
-      c.width = Math.round(bmp.width * k); c.height = Math.round(bmp.height * k);
-      c.getContext('2d').drawImage(bmp, 0, 0, c.width, c.height);
-      const data = c.toDataURL('image/jpeg', 0.9).split(',')[1];
-      await push(ref(db, 'rooms/' + room + '/cmds'), { t: 'photo', v: data, at: serverTimestamp() });
-      st.textContent = '✓ 보냈습니다 · 태블릿에 새 환자로 등록됩니다';
-      setTimeout(() => { if (st.textContent.startsWith('✓')) st.textContent = ''; }, 6000);
-    } catch (err) {
-      console.error(err);
-      st.textContent = '사진을 보내지 못했습니다 · 다른 사진으로 시도해 주세요';
-    }
-  });
 })();
 
 // ---- 서비컬 라인 그리기 (마우스·펜) ----
@@ -932,7 +910,7 @@ const CRIT = ['기준 1 공간 폐쇄·아치 정렬', '기준 2 교합·맞물�
 function setHtml(el, html) { if (el._h !== html) { el._h = html; el.innerHTML = html; } }
 const imgUrl = (b64) => (b64 ? 'data:image/jpeg;base64,' + b64 : '');
 function openOv(id) { $('#' + id).hidden = false; }
-function closeOv(id) { $('#' + id).hidden = true; }
+function closeOv(id) { $('#' + id).hidden = true; if (id === 'camOv') camStop(); }
 document.querySelectorAll('[data-close]').forEach((b) => b.addEventListener('click', () => closeOv(b.dataset.close)));
 document.addEventListener('keydown', (e) => {
   if (e.key !== 'Escape') return;
@@ -1282,8 +1260,79 @@ $('#recDetBody').addEventListener('click', (e) => {
   if ($('#detAfter')) $('#detAfter').src = full && full.img ? imgUrl(full.img) : '';
 });
 // 비교 목록 [🗂 기록 사진] · 첫 화면 [🗂 기록 사진 불러오기] → 기록을 열고 사진 아래 [＋ 이 사진만 불러오기]
-$('#pickRec').addEventListener('click', () => { openOv('recOv'); renderRecords(); });
-$('#recPhotoBtn').addEventListener('click', () => { openOv('recOv'); renderRecords(); });
+// 📂 불러오기: PC 파일(여러 장) 또는 환자 기록 → 비교 목록
+$('#pickLoad').addEventListener('click', (e) => { e.stopPropagation(); $('#loadMenu').hidden = !$('#loadMenu').hidden; });
+$('#loadMenu').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-load]'); if (!b) return;
+  $('#loadMenu').hidden = true;
+  if (b.dataset.load === 'file') $('#pickFile').click();
+  else { openOv('recOv'); renderRecords(); }
+});
+document.addEventListener('click', (e) => { if (!e.target.closest('.pick-add')) $('#loadMenu').hidden = true; });
+
+// 🧪 전문가 모드: 자동 QA · 환자 기록 · 보관함 버튼 (PC 마다 기억)
+let expert = false;
+try { expert = localStorage.getItem('bna.expert') === '1'; } catch (e) { /* 저장 못 해도 이번엔 사용 */ }
+function applyExpert() {
+  $('#expertMode').checked = expert;
+  for (const id of ['qaBtn', 'recBtn', 'archBtn']) $('#' + id).hidden = !expert;
+}
+$('#expertMode').addEventListener('change', (e) => {
+  expert = e.target.checked;
+  try { localStorage.setItem('bna.expert', expert ? '1' : '0'); } catch (err) { /* 무시 */ }
+  applyExpert();
+});
+applyExpert();
+
+// 📷 사진 촬영 (PC 카메라) → 원본 1·2 로
+let camStream = null, camShotData = null;
+function camStop() { if (camStream) { camStream.getTracks().forEach((t) => t.stop()); camStream = null; } }
+async function camStart(deviceId) {
+  camStop();
+  $('#camMsg').textContent = '카메라를 켜는 중…';
+  try {
+    camStream = await navigator.mediaDevices.getUserMedia({ video: deviceId ? { deviceId: { exact: deviceId }, width: { ideal: 1920 } } : { width: { ideal: 1920 }, height: { ideal: 1080 } }, audio: false });
+    $('#camVideo').srcObject = camStream;
+    const cams = (await navigator.mediaDevices.enumerateDevices()).filter((d) => d.kind === 'videoinput');
+    const sel = $('#camSel');
+    sel.hidden = cams.length < 2;
+    if (cams.length > 1 && !sel.options.length) {
+      sel.innerHTML = cams.map((c, i) => `<option value="${esc(c.deviceId)}">${esc(c.label || '카메라 ' + (i + 1))}</option>`).join('');
+    }
+    $('#camMsg').textContent = '얼굴을 화면 가운데에 맞추고 [📸 찍기]';
+  } catch (err) {
+    console.error(err);
+    $('#camMsg').textContent = '카메라를 켤 수 없어요 · 카메라가 연결돼 있는지, 브라우저 카메라 권한을 허용했는지 확인해 주세요';
+  }
+}
+function camMode(shot) {
+  $('#camVideo').hidden = shot; $('#camShot').hidden = !shot;
+  $('#camSnap').hidden = shot; $('#camRetake').hidden = !shot; $('#camTo1').hidden = !shot; $('#camTo2').hidden = !shot;
+}
+$('#camBtn').addEventListener('click', () => { camShotData = null; camMode(false); openOv('camOv'); camStart(); });
+$('#camSel').addEventListener('change', (e) => camStart(e.target.value));
+$('#camSnap').addEventListener('click', () => {
+  const v = $('#camVideo');
+  if (!v.videoWidth) { $('#camMsg').textContent = '카메라 화면이 아직 없어요'; return; }
+  const k = Math.min(1, 2400 / Math.max(v.videoWidth, v.videoHeight));
+  const c = document.createElement('canvas');
+  c.width = Math.round(v.videoWidth * k); c.height = Math.round(v.videoHeight * k);
+  c.getContext('2d').drawImage(v, 0, 0, c.width, c.height);
+  const url = c.toDataURL('image/jpeg', 0.92);
+  camShotData = url.split(',')[1];
+  $('#camShot').src = url;
+  camMode(true);
+  $('#camMsg').textContent = '어느 원본으로 보낼까요?';
+});
+$('#camRetake').addEventListener('click', () => { camShotData = null; camMode(false); });
+for (const k of [1, 2]) {
+  $('#camTo' + k).addEventListener('click', () => {
+    if (!camShotData) return;
+    cmd('slotPhoto', { s: k, b: camShotData });
+    camShotData = null;
+    camStop(); closeOv('camOv');
+  });
+}
 
 // 태블릿 알림을 PC 에도 (불러왔어요·뺐어요 …)
 let noticeAt = null, toastTimer = 0;

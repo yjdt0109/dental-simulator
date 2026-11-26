@@ -5,7 +5,7 @@
 
 ## 1. 현재 버전
 - 태블릿 앱(안드로이드 APK, Flutter): **2026.11.26-a** (`lib/cast/cast_service.dart`의 `appVersion`)
-- 상담 PC 모니터(웹, Netlify에 폴더째 끌어다 놓기): **v3.39** (`monitor-web/`)
+- 상담 PC 모니터(웹, Netlify에 폴더째 끌어다 놓기): **v3.40** (`monitor-web/`)
 - 자동 테스트: 150개 모두 통과 (`flutter test`)
 
 ## 2. 구성
@@ -40,7 +40,8 @@
 22. **2026.11.26-a**: 옵션 B 오류 수정 — Firebase 에 `gemini-3-pro-image-preview` 가 없음(Publisher model not found). `TwoPassPipeline.proFinish`: 설정 이름 → 후보(`gemini-3-pro-image` 등) 차례로 → 모두 없으면 fal.ai `nano-banana-pro/edit` 로(이후 계속 fal, `proViaFal`). PC 변경 없음(v3.38 그대로)
 23. **2026.11.25-f ③② (치아 길이·형태·경계)**: ③ `marginLockedRegion`(tooth_select.dart): 🪄 고른 치아의 잇몸 쪽 경계만 고정, 절단 쪽 치아 길이 25%(가장 긴 곳 기준이라 깨진 치아도 채움) + 옆에 고른 치아가 있으면 틈까지 15% 열기 → FLUX 마스크·원본 복원 영역으로 사용. 라미네이트·올세라믹·임플란트·교정에 적용(무삭제는 기존 10% 길게, 미백은 윤곽 그대로). ② `align_fix.dart` `alignAiToSource`: AI 결과를 원본과 비교(160px 회색조, ±4% 크기·±5% 밀림, 바뀐 치아 영향 줄이게 차이 40에서 자름)해 3% 이상 나아질 때만 되돌림 → `_fullResult`(모든 전체 사진 AI 결과)에 적용
 24. **🆕 단계형 새 시뮬레이터 화면 (2026.11.26-a / PC v3.39)**: `lib/simulator/step_flow.dart` (simulator_screen.dart 의 part, extension `_StepFlow`). 위 단계 표시줄 ① 사진 ② 치아 고르기 ③ 치료 정하기 ④ After 만들기 ⑤ 다듬기 ⑥ Final Smile ⑦ 저장 + 오른쪽(폰은 아래) 지금 단계 패널 + [이전]/[다음]. 기능은 기존 것 재사용(`_convertBox`, `_panel(only:{…})` 조각, `_openResize`, `_finalSmile`, `_confirm`), 비교 목록은 4단계부터. 기본(새 화면), 위쪽 아이콘·더보기로 [예전 화면] 전환(pref `ui.stepFlow`). 새 화면 처음 쓸 때 엔진 기본을 옵션 B 로(한 번만). 테스트는 `test/flutter_test_config.dart` 에서 `debugStepFlowOff=true`(예전 화면 기준), 새 화면 테스트는 `step_flow_test.dart`. **사진 돌리기** ⟲⟳(`rotatePhoto`, 슬롯 사진 새로 만듦 → 그 사진 After·치아 선택 지워짐 경고) + 올릴 때 EXIF 방향 자동 바로 세우기(`normalizeOrientation`). **＋ 새 작업**(위쪽 버튼·7단계 끝·PC 머리 버튼): 빈 자리(`PatientPhoto.blank`) 로 1단계부터. PC: 단계 표시줄(명령 `step`), 카드 ⟲⟳(`slotRotate`), [＋ 새 작업](`newCase`, 저장 안 했으면 확인)
-25. **상담 PC**: 위 기능 대부분을 마우스로 (SAM, 기준점, 크기 조절, QA, 보관함, 기록, 미소)
+25. **PC v3.40 (태블릿 변경 없음)**: 비교 목록 위 [기록 사진]·[사진 올리기]와 아래 [기록 사진 불러오기]를 **[📂 불러오기]** 하나로(메뉴: 💻 PC 파일에서 여러 장 → `extraPhoto` / 🗂 환자 기록에서 → 기록 창). 오른쪽 [PC에서 사진 올리기] → **[📷 사진 촬영]**(웹캠 getUserMedia, 카메라 여러 개면 고르기, 찍은 뒤 [원본 2로]/[원본 1로] → `slotPhoto`). 위쪽 [자동 QA]·[환자 기록]·[보관함]은 **🧪 전문가 모드** 체크(PC마다 localStorage `bna.expert`)일 때만 보임
+26. **상담 PC**: 위 기능 대부분을 마우스로 (SAM, 기준점, 크기 조절, QA, 보관함, 기록, 미소)
 
 ## 4. 마지막 대화에서 논의 중이던 것 (다음 할 일)
 - ③·② 넣음(2026.11.25-f) → 사용자 실제 테스트 결과 대기. 남은 제안: ④ 일반 라미네이트·크라운에도 원하는 절단선 지정, 경계 자동 검사(차이 크면 재시도)
@@ -62,7 +63,7 @@ flutter pub get
 flutter test
 flutter build apk --release   # build/app/outputs/flutter-apk/app-release.apk
 ```
-- PC 모니터: `monitor-web` 폴더를 Netlify에 그대로 올림 (사용자에게는 `monitor-web-v3.xx.zip` 으로 묶어 전달). 새 버전 만들 때 index.html의 버전(3.39)을 올림
+- PC 모니터: `monitor-web` 폴더를 Netlify에 그대로 올림 (사용자에게는 `monitor-web-v3.xx.zip` 으로 묶어 전달). 새 버전 만들 때 index.html의 버전(3.40)을 올림
 - 버전 올리기: `lib/cast/cast_service.dart`의 `appVersion` + PC `app.js` 안의 "2026.11.26-a 이상" 문구
 
 ## 6. 주요 파일
