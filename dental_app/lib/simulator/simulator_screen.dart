@@ -362,6 +362,7 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
     }
     _nameCtrl.dispose();
     _memoCtrl.dispose();
+    _finalReqCtrl.dispose();
     _aiReqCtrl.dispose();
     _headNameFocus.dispose();
     _scroll.dispose();
@@ -4191,9 +4192,25 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
   Uint8List? _slot1Bytes(PatientPhoto p) =>
       _slotPhoto(p, 1)?.beforeBytes ?? (p.slot == 2 ? p.smile : null);
 
-  /// 2단계에 쓸 After: 지금 사진의 After, 없으면 짝 사진의 After
-  Uint8List? _finalAfter(PatientPhoto p) =>
-      _shownAfter(p) ?? (p.pair == null ? null : _shownAfter(p.pair!));
+  /// 2단계에 쓸 After: 고른 After → 지금 사진의 After → 짝 사진의 After →
+  /// 그래도 없으면 목록의 After(기록에서 불러온 After·크기조절 포함) 중 마지막
+  Uint8List? _finalAfter(PatientPhoto p) {
+    final ch = _afterChoices(p);
+    if (_finalAfterKey != null) {
+      for (final c in ch) {
+        if (c.key == _finalAfterKey) return c.bytes;
+      }
+    }
+    return _shownAfter(p) ??
+        (p.pair == null ? null : _shownAfter(p.pair!)) ??
+        (ch.isEmpty ? null : ch.last.bytes);
+  }
+
+  /// 5단계 Final Smile 옵션 (사용자 요청 2026.11.27-g: 다시 만들기·이어서 다듬기·추가 요청)
+  String? _finalAfterKey; // 쓸 After (null = 자동)
+  bool _finalFromPrev = false; // 지난 Final Smile 을 바탕으로 이어서
+  bool _finalKeepLen = true; // 원래 미소의 치아 길이 유지
+  final _finalReqCtrl = TextEditingController();
 
   bool _finalReady(PatientPhoto p) =>
       _slot1Bytes(p) != null && _finalAfter(p) != null && !_finalBusy;
@@ -4474,9 +4491,16 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
       _finalMsg = '✨ 2단계: 원본 1에 After 치열을 맞추는 중… (나노바나나)';
     });
     try {
+      final prev = _finalFromPrev ? p.smileAfter : null;
+      final prompt = finalSmilePrompt(
+        keepLength: _finalKeepLen,
+        extra: _finalReqCtrl.text,
+      );
       final r = await (debugFinalSmile ?? makeFinalSmile)(
         orig1: s1,
         after: after,
+        base: prev,
+        prompt: prompt,
       );
       if (!mounted) return;
       if (!identical(p.smile, s1)) await setSmile(p, s1);
@@ -4484,7 +4508,15 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
       setState(() {
         p.smileAfter = r.image;
         p.smileFrom = 'Final Smile (2단계)';
-        p.addExtra(r.image, '✨ Final Smile', sub: 'After 치열 → 원본 1', pair: s1);
+        final nf = p.extras
+            .where((e) => e.label.contains('Final Smile'))
+            .length;
+        p.addExtra(
+          r.image,
+          nf == 0 ? '✨ Final Smile' : '✨ Final Smile ${nf + 1}',
+          sub: prev != null ? '지난 Final Smile 이어서' : 'After 치열 → 원본 1',
+          pair: s1,
+        );
         p.noteSmile();
         _smileView = true;
         _finalMsg = r.lipsLocked

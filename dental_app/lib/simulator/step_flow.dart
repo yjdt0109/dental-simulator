@@ -329,16 +329,14 @@ extension _StepFlow on _SimulatorHomeScreenState {
           ),
           _slotCard(p, 1),
           const SizedBox(height: 10),
-          Text(
-            _finalAfter(p) == null
-                ? '⚠ 먼저 3단계에서 After 를 만들어 주세요'
-                : '쓸 After: ${_finalAfterLabel(p)}',
-            style: const TextStyle(fontSize: 12.5, color: AppColors.gray500),
-          ),
+          if (_finalAfter(p) == null)
+            _warn('⚠ 먼저 3단계에서 After 를 만들어 주세요')
+          else
+            _finalOptions(p, locked),
           const SizedBox(height: 10),
           FilledButton.icon(
             style: FilledButton.styleFrom(minimumSize: const Size(0, 52)),
-            onPressed: _finalReady(p) ? () => _finalSmile(p) : null,
+            onPressed: _finalReady(p) && !locked ? () => _finalSmile(p) : null,
             icon: _finalBusy
                 ? const SizedBox(
                     width: 18,
@@ -349,7 +347,13 @@ extension _StepFlow on _SimulatorHomeScreenState {
                     ),
                   )
                 : const Icon(Icons.auto_awesome),
-            label: Text(_finalBusy ? '만드는 중…' : '✨ Final Smile 만들기'),
+            label: Text(
+              _finalBusy
+                  ? '만드는 중…'
+                  : p.smileAfter == null
+                  ? '✨ Final Smile 만들기'
+                  : '✨ Final Smile 다시 만들기',
+            ),
           ),
           if (_finalMsg.isNotEmpty) ...[
             const SizedBox(height: 8),
@@ -508,6 +512,110 @@ extension _StepFlow on _SimulatorHomeScreenState {
       ),
     );
     if (pick != null) await _pickBase(pick.k, pick.n);
+  }
+
+  /// 5단계: 쓸 After · 이어서 다듬기 · 길이 유지 · 추가 요청 · Final Smile 크기 조절
+  Widget _finalOptions(PatientPhoto p, bool locked) {
+    final ch = _afterChoices(p);
+    final auto = _finalAfter(p);
+    final curKey = ch
+        .where((c) => c.key == _finalAfterKey || identical(c.bytes, auto))
+        .map((c) => c.key)
+        .lastOrNull;
+    const quick = ['치아 길이는 원래 미소처럼', '조금 더 짧게', '조금 더 길게', '더 하얗게', '색은 자연스럽게'];
+    final finalIdx = p.extras.lastIndexWhere(
+      (e) => identical(e.bytes, p.smileAfter),
+    );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (ch.length > 1)
+          DropdownButtonFormField<String>(
+            initialValue: curKey,
+            isExpanded: true,
+            decoration: const InputDecoration(
+              labelText: '쓸 After (치열 참고 사진)',
+              isDense: true,
+            ),
+            items: [
+              for (final c in ch)
+                DropdownMenuItem(
+                  value: c.key,
+                  child: Text(c.label, overflow: TextOverflow.ellipsis),
+                ),
+            ],
+            onChanged: locked ? null : (v) => _ss(() => _finalAfterKey = v),
+          )
+        else
+          Text(
+            '쓸 After: ${ch.isEmpty ? _finalAfterLabel(p) : ch.first.label}',
+            style: const TextStyle(fontSize: 12.5, color: AppColors.gray500),
+          ),
+        if (p.smileAfter != null)
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            value: _finalFromPrev,
+            onChanged: locked ? null : (v) => _ss(() => _finalFromPrev = v),
+            title: const Text('지난 Final Smile 을 바탕으로 이어서 다듬기'),
+            subtitle: const Text('끄면 원본 1(미소)에서 새로 만들어요'),
+          ),
+        SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          value: _finalKeepLen,
+          onChanged: locked ? null : (v) => _ss(() => _finalKeepLen = v),
+          title: const Text('원래 미소의 치아 길이 유지'),
+          subtitle: const Text('켜 두면 치아가 길게 나오지 않아요 (일부러 길게 하려면 끄세요)'),
+        ),
+        const SizedBox(height: 4),
+        TextField(
+          controller: _finalReqCtrl,
+          enabled: !locked,
+          minLines: 1,
+          maxLines: 3,
+          style: const TextStyle(fontSize: 13, height: 1.4),
+          decoration: const InputDecoration(
+            isDense: true,
+            labelText: '추가 요청 (선택 · 한글 OK)',
+            hintText: '예: 위 앞니 길이 조금 짧게, 아랫니는 그대로',
+          ),
+          onChanged: (_) => _ss(() {}),
+        ),
+        const SizedBox(height: 6),
+        Wrap(
+          spacing: 6,
+          runSpacing: 6,
+          children: [
+            for (final q in quick)
+              ActionChip(
+                label: Text(q, style: const TextStyle(fontSize: 12)),
+                onPressed: locked
+                    ? null
+                    : () => _ss(() {
+                        final t = _finalReqCtrl.text.trim();
+                        _finalReqCtrl.text = t.isEmpty ? q : '$t, $q';
+                      }),
+              ),
+          ],
+        ),
+        if (p.smileAfter != null && finalIdx >= 0) ...[
+          const SizedBox(height: 8),
+          OutlinedButton.icon(
+            onPressed: locked || _finalBusy
+                ? null
+                : () {
+                    // 크기 조절 대상을 Final Smile 로
+                    _ss(() {
+                      p.editing = false;
+                      p.sel = [-(finalIdx + 1)];
+                    });
+                    _openResize(p);
+                  },
+            icon: const Icon(Icons.open_in_full_rounded),
+            label: const Text('🦷 Final Smile 치아 크기 조절 (길이·폭)'),
+          ),
+        ],
+      ],
+    );
   }
 
   String _finalAfterLabel(PatientPhoto p) {

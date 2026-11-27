@@ -27,6 +27,28 @@ const kFinalSmilePrompt =
     'and text overlays from the teeth. Apply realistic tooth enamel texture and a natural soft shadow cast by the upper lip onto '
     'the top portion of the teeth so it blends seamlessly. Photorealistic clinical portrait.';
 
+/// 원래 미소의 치아 길이 유지 (2026.11.27-g): After 는 개구기 사진이라 치아가 끝까지 다 보여서,
+/// 그대로 옮기면 입술 사이를 꽉 채워 치아가 길어 보였음 → 보이는 길이·절단끝 높이는 첫 사진 그대로
+const kFinalSmileKeepLength =
+    'IMPORTANT - keep the tooth display of the first image: the incisal edges of the upper teeth must stay at the same height '
+    'as in the first image and every tooth must show the same visible length as in the first image. Do NOT make the teeth '
+    'longer or larger and do NOT fill the whole mouth opening with teeth. Keep the lower teeth, the dark space between the '
+    'upper and lower teeth and the dark corners of the mouth (buccal corridors) as they are in the first image. '
+    'Use the second image only as a reference for tooth shape, alignment, the proportions between the teeth and color.';
+
+/// 2단계 지시문 만들기: 기본 문구 + (길이 유지) + (추가 요청, 한글 가능)
+String finalSmilePrompt({bool keepLength = true, String extra = ''}) {
+  final b = StringBuffer(kFinalSmilePrompt);
+  if (keepLength) b.write(' $kFinalSmileKeepLength');
+  final x = extra.trim();
+  if (x.isNotEmpty) {
+    b.write(
+      ' Additional request from the dentist (may be written in Korean, follow it): $x',
+    );
+  }
+  return b.toString();
+}
+
 /// fal.ai Nano Banana 편집 (여러 장 입력 → 1장)
 class FalNanoBananaEdit {
   FalNanoBananaEdit(this.key, {http.Client? client, this.pro = false})
@@ -122,6 +144,8 @@ class FalNanoBananaEdit {
 Future<({Uint8List image, bool lipsLocked})> Function({
   required Uint8List orig1,
   required Uint8List after,
+  Uint8List? base,
+  String prompt,
 })?
 debugFinalSmile;
 
@@ -133,9 +157,13 @@ typedef LipsFn = Future<List<Offset>?> Function(Uint8List smile);
 
 /// 2단계 실행: 원본 1 + After → 최종 미소.
 /// 입술 사이를 찾으면 그 바깥(입술·얼굴)은 원본 1 픽셀로 한 번 더 고정 (AI 가 입술을 바꿨을 때 대비)
+/// [base]: 첫 번째로 보낼 사진 (없으면 원본 1). 지난 Final Smile 을 넣으면 그걸 이어서 다듬음.
+///   입술·얼굴 고정은 항상 원본 1 기준
 Future<({Uint8List image, bool lipsLocked})> makeFinalSmile({
   required Uint8List orig1,
   required Uint8List after,
+  Uint8List? base,
+  String prompt = kFinalSmilePrompt,
   FinalEditFn? edit,
   LipsFn? lips,
   bool pro = false,
@@ -156,9 +184,16 @@ Future<({Uint8List image, bool lipsLocked})> makeFinalSmile({
       };
   final src = await AiService.decodePhoto(orig1, maxSide: 2000);
   final a = await AiService.decodePhoto(after, maxSide: 1536);
-  final j1 = await AiService.photoJpeg(src);
+  var first = src;
+  if (base != null) {
+    final bi = await AiService.decodePhoto(base, maxSide: 2000);
+    first = (bi.width == src.width && bi.height == src.height)
+        ? bi
+        : img.copyResize(bi, width: src.width, height: src.height);
+  }
+  final j1 = await AiService.photoJpeg(first);
   final j2 = await AiService.photoJpeg(a);
-  final out = await run([j1, j2], kFinalSmilePrompt); // 순서: 원본 1, After
+  final out = await run([j1, j2], prompt); // 순서: 원본 1(또는 지난 Final Smile), After
   List<Offset>? poly;
   try {
     poly = await (lips ?? MouthFinder.lips)(orig1);

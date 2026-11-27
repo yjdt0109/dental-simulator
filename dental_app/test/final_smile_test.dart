@@ -39,6 +39,89 @@ Future<void> _settle(WidgetTester t, {bool Function()? until}) async {
 }
 
 void main() {
+  testWidgets('🆕 Final Smile: 길이 유지 지시 · 다시 만들기 · 이어서 다듬기 · 추가 요청', (t) async {
+    debugStepFlowOff = false;
+    addTearDown(() => debugStepFlowOff = true);
+    t.view.physicalSize = const Size(1440, 900);
+    t.view.devicePixelRatio = 1;
+    addTearDown(t.view.reset);
+    final bases = <Uint8List?>[];
+    final prompts = <String>[];
+    debugFinalSmile =
+        ({required orig1, required after, base, prompt = ''}) async {
+          bases.add(base);
+          prompts.add(prompt);
+          // 매번 다른 사진 (같은 사진은 목록에 한 번만 들어가므로)
+          return (
+            image: jpg(240 - prompts.length * 20, w: 160, h: 120),
+            lipsLocked: true,
+          );
+        };
+    addTearDown(() => debugFinalSmile = null);
+    await t.pumpWidget(
+      MaterialApp(
+        theme: buildTheme(),
+        home: const SimulatorHomeScreen(profile: _profile),
+      ),
+    );
+    await _settle(t, until: () => find.byType(RoiEditor).evaluate().isNotEmpty);
+    final send = CastService.instance.onRemoteCmd!;
+    send({'t': 'clearTeeth'});
+    send({
+      't': 'group',
+      'v': [13, 12, 11, 21, 22, 23],
+    });
+    send({'t': 'tx', 'v': '미백'});
+    await t.pump();
+    send({'t': 'convert'});
+    await _settle(
+      t,
+      until: () => find.textContaining('After 1').evaluate().isNotEmpty,
+    );
+    await t.runAsync(() async {
+      send({
+        't': 'slotPhoto',
+        'v': {'s': 1, 'b': base64Encode(jpg(150, w: 160, h: 120))},
+      });
+      await Future<void>.delayed(const Duration(milliseconds: 800));
+    });
+    await _settle(t);
+    send({'t': 'step', 'v': 5});
+    await _settle(t);
+    expect(find.text('원래 미소의 치아 길이 유지'), findsOneWidget);
+    await t.ensureVisible(find.text('✨ Final Smile 만들기'));
+    await t.pump();
+    await t.runAsync(() async {
+      await t.tap(find.text('✨ Final Smile 만들기'));
+      await Future<void>.delayed(const Duration(milliseconds: 500));
+    });
+    await _settle(t, until: () => prompts.isNotEmpty);
+    await _settle(t);
+    expect(prompts.first, contains('same visible length'));
+    expect(bases.first, isNull); // 처음은 원본 1 에서
+    // 다시 만들기: 이어서 다듬기 + 추가 요청
+    expect(find.text('✨ Final Smile 다시 만들기'), findsOneWidget);
+    expect(find.textContaining('먼저 3단계'), findsNothing);
+    expect(find.text('🦷 Final Smile 치아 크기 조절 (길이·폭)'), findsOneWidget);
+    await t.ensureVisible(find.text('지난 Final Smile 을 바탕으로 이어서 다듬기'));
+    await t.tap(find.text('지난 Final Smile 을 바탕으로 이어서 다듬기'));
+    await t.ensureVisible(find.text('조금 더 짧게'));
+    await t.tap(find.text('조금 더 짧게'));
+    await t.pump();
+    await t.ensureVisible(find.text('✨ Final Smile 다시 만들기'));
+    await t.pump();
+    await t.runAsync(() async {
+      await t.tap(find.text('✨ Final Smile 다시 만들기'));
+      await Future<void>.delayed(const Duration(milliseconds: 500));
+    });
+    await _settle(t, until: () => prompts.length > 1);
+    await _settle(t);
+    expect(bases.last, isNotNull); // 지난 Final Smile 을 바탕으로
+    expect(prompts.last, contains('조금 더 짧게'));
+    expect(find.textContaining('Final Smile 2'), findsWidgets);
+    expect(t.takeException(), isNull);
+  });
+
   test('fal 나노바나나 요청: image_urls 순서 [원본 1, After], 지시문 상수, sync_mode', () {
     final a = Uint8List.fromList([1, 2, 3]), b = Uint8List.fromList([4, 5]);
     final body = FalNanoBananaEdit.body([a, b], kFinalSmilePrompt);
@@ -99,11 +182,12 @@ void main() {
     addTearDown(t.view.reset);
     Uint8List? gotOrig1, gotAfter;
     final finalImg = jpg(251, w: 160, h: 120);
-    debugFinalSmile = ({required orig1, required after}) async {
-      gotOrig1 = orig1;
-      gotAfter = after;
-      return (image: finalImg, lipsLocked: true);
-    };
+    debugFinalSmile =
+        ({required orig1, required after, base, prompt = ''}) async {
+          gotOrig1 = orig1;
+          gotAfter = after;
+          return (image: finalImg, lipsLocked: true);
+        };
     addTearDown(() => debugFinalSmile = null);
     await t.pumpWidget(
       MaterialApp(
