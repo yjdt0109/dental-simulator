@@ -1227,6 +1227,9 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
       case 'before': // 원본 화면 (서비컬 라인·🪄 치아 고르기)
         setState(() => _toEditView(p));
         return;
+      case 'newCase': // PC ＋ 새 작업 (상담 완료·저장한 환자에서도 새로 시작해야 하므로 잠금 전에)
+        _newCase();
+        return;
       case 'confirmSave': // PC 💾 저장 및 상담 완료 (PC 에서 이미 확인 받음)
         _confirm(ask: false);
         return;
@@ -1399,8 +1402,6 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
             ask: false,
           );
         }
-      case 'newCase': // PC ＋ 새 작업
-        _newCase();
       case 'step': // PC 단계 이동
         if (v is int && v >= 1 && v <= 7) _goStep(v);
       case 'slotSelect': // PC 변환할 원본 고르기 (1 미소 / 2 개구기)
@@ -2699,10 +2700,10 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
     }
     CastService.instance.put('smileImg', {
       'id': p.id,
-      'photo': await jpegBase64(sm, maxSide: 1280),
+      'photo': await jpegBase64(sm),
       if (p.smileSet?.overlay != null) 'ov': base64Encode(p.smileSet!.overlay!),
       if (p.smileAfter != null)
-        'after': await jpegBase64(p.smileAfter!, maxSide: 1280),
+        'after': await jpegBase64(p.smileAfter!),
       if (_mFor == p.id && _mProsth != null)
         'p2': await jpegBase64(_mProsth!, maxSide: 480, quality: 75),
       // 오늘 만든 After 작은 사진 (PC 정밀 매칭에서 고르기)
@@ -2711,9 +2712,9 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
           a.key: await jpegBase64(a.bytes, maxSide: 200, quality: 65),
       },
       if (_mFor == p.id && _mRes != null) ...{
-        'm1': await jpegBase64(_mRes!.composite, maxSide: 1280),
-        'm2': await jpegBase64(_mRes!.stage1, maxSide: 1280),
-        'm3': await jpegBase64(_mRes!.finalImage, maxSide: 1280),
+        'm1': await jpegBase64(_mRes!.composite),
+        'm2': await jpegBase64(_mRes!.stage1),
+        'm3': await jpegBase64(_mRes!.finalImage),
       },
     });
   }

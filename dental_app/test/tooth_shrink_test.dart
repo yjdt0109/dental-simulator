@@ -68,6 +68,47 @@ void main() {
     expect(out.getPixel(60, 50).r, greaterThan(220));
   });
 
+  test('➖ 길이 줄이기: 바로 옆 치아는 구멍 나지 않고 그대로', () {
+    // 가운데 치아(40..80) 양옆에 붙은 옆 치아(10..38, 82..110)
+    final src = img.Image(width: 120, height: 160)
+      ..clear(img.ColorRgb8(30, 20, 20));
+    for (final (a, b) in [(10, 38), (40, 80), (82, 110)]) {
+      img.fillRect(
+        src,
+        x1: a,
+        y1: 20,
+        x2: b,
+        y2: 100,
+        color: img.ColorRgb8(240, 240, 230),
+      );
+    }
+    final mask = img.Image(width: 120, height: 160, numChannels: 1);
+    img.fillRect(
+      mask,
+      x1: 40,
+      y1: 20,
+      x2: 80,
+      y2: 100,
+      color: img.ColorRgb8(255, 255, 255),
+    );
+    final out = scaleToothMasked(
+      src,
+      mask,
+      const Rect.fromLTRB(40, 20, 81, 101),
+      down: -24,
+    );
+    expect(out.getPixel(60, 95).r, lessThan(80)); // 줄인 치아 끝은 어두움
+    for (final y in [70, 85, 95, 99]) {
+      for (final x in [36, 84]) {
+        expect(
+          out.getPixel(x, y).r,
+          greaterThan(200),
+          reason: '옆 치아 ($x,$y) 구멍',
+        );
+      }
+    }
+  });
+
   test('크기 조절 세션: 줄이기 −30% 까지 허용', () {
     final s = ResizeSession(
       image: Uint8List(0),

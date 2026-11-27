@@ -769,6 +769,36 @@ img.Image warpTooth(
   return out;
 }
 
+/// 마스크를 가로 [rx]·세로 [ry] 픽셀만큼 따로 넓힘 (방향별 최대값 필터, 1채널 결과)
+img.Image _dilateDir(img.Image m, {required int rx, required int ry}) {
+  final w = m.width, h = m.height;
+  var a = List<int>.generate(w * h, (i) => m.getPixel(i % w, i ~/ w).r.toInt());
+  List<int> pass(List<int> v, int r, bool horiz) {
+    if (r <= 0) return v;
+    final o = List<int>.filled(w * h, 0);
+    for (var y = 0; y < h; y++) {
+      for (var x = 0; x < w; x++) {
+        var mx = 0;
+        for (var d = -r; d <= r && mx < 255; d++) {
+          final xx = horiz ? x + d : x, yy = horiz ? y : y + d;
+          if (xx < 0 || yy < 0 || xx >= w || yy >= h) continue;
+          final q = v[yy * w + xx];
+          if (q > mx) mx = q;
+        }
+        o[y * w + x] = mx;
+      }
+    }
+    return o;
+  }
+
+  a = pass(pass(a, rx, true), ry, false);
+  final out = img.Image(width: w, height: h, numChannels: 1);
+  for (var i = 0; i < w * h; i++) {
+    out.setPixelR(i % w, i ~/ w, a[i]);
+  }
+  return out;
+}
+
 /// 🦷 치아 윤곽만 키우기: [mask](치아 = 흰색, 크기 무관) 안의 치아 픽셀만 [box](픽셀) 기준으로
 /// 위/아래/왼쪽/오른쪽으로 늘려 원래 사진 위에 덮음. 잇몸·옆 치아는 원본 그대로 (키운 치아가 앞으로).
 img.Image scaleToothMasked(
@@ -797,9 +827,30 @@ img.Image scaleToothMasked(
   //   그 바깥에서 배경을 끌어옴: 절단끝 → 아래(입 안·아래 치아), 잇몸 쪽 → 위 잇몸, 옆 → 옆 공간
   if (left < 0 || right < 0 || up < 0 || down < 0) {
     final mxH = box.height * 0.08 + 3, mxW = box.width * 0.08 + 3; // 넓히는 양(px)
+    // 줄이는 방향으로만 넓힘: 길이를 줄일 때 옆으로 넓히면 옆 치아 가장자리까지 덮여
+    // 입 안 어두운 색이 들어가 '구멍'처럼 보였음 (2026.11.27-c)
+    final vShrink = up < 0 || down < 0, hShrink = left < 0 || right < 0;
+    final gm = mask.numChannels == 1 ? mask : img.grayscale(mask.clone());
+    final rxPx = hShrink ? mxW : box.width * 0.02 + 1.5,
+        ryPx = vShrink ? mxH : box.height * 0.02 + 1.5;
+    // 치아 주변만 잘라서 계산 (큰 사진에서도 빠르게)
+    final ox = math.max(0, ((box.left - 2 * mxW) * mx).floor()),
+        oy = math.max(0, ((box.top - 2 * mxH) * my).floor());
+    final ow = math.min(gm.width, ((box.right + 2 * mxW) * mx).ceil() + 1) - ox,
+        oh = math.min(gm.height, ((box.bottom + 2 * mxH) * my).ceil() + 1) - oy;
     final wide = img.gaussianBlur(
-      mask.numChannels == 1 ? mask.clone() : img.grayscale(mask.clone()),
-      radius: math.max(2, (mxH * 1.3 * mask.height / src.height).round()),
+      _dilateDir(
+        img.copyCrop(
+          gm,
+          x: ox,
+          y: oy,
+          width: math.max(1, ow),
+          height: math.max(1, oh),
+        ),
+        rx: (rxPx * mx).round(),
+        ry: (ryPx * my).round(),
+      ),
+      radius: math.max(1, (2 * mx).round()),
     );
     final cx = box.center.dx, cy = box.center.dy;
     final bx0 = math.max(0, (box.left - mxW).floor()),
@@ -811,15 +862,18 @@ img.Image scaleToothMasked(
         final w0 =
             wide
                 .getPixelInterpolate(
-                  x * mx,
-                  y * my,
+                  x * mx - ox,
+                  y * my - oy,
                   interpolation: img.Interpolation.linear,
                 )
                 .r /
             255.0;
         if (w0 <= 0.02) continue;
         // 넓힌 윤곽 안은 확실히 덮고(가장자리만 살짝 부드럽게)
-        final a0 = math.min(1.0, w0 * 6);
+        // 흐림이 옆으로 새어 나간 옅은 부분은 버림 (옆 치아 보호)
+        final t0 = ((w0 - 0.3) / 0.4).clamp(0.0, 1.0);
+        final a0 = t0 * t0 * (3 - 2 * t0);
+        if (a0 <= 0) continue;
         double fx = x.toDouble(), fy = y.toDouble();
         if (down < 0 && y >= cy) {
           fy = y - down + mxH; // 줄인 만큼 + 넓힌 만큼 아래에서

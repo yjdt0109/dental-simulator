@@ -28,7 +28,7 @@ class CastService extends ChangeNotifier {
   static final CastService instance = CastService._();
 
   /// 앱 버전 (PC 상담 모니터에 표시 → 태블릿이 최신 앱인지 확인용)
-  static const appVersion = '2026.11.27-b';
+  static const appVersion = '2026.11.27-c';
 
   /// PC 에서 받은 명령 수 (PC 가 '태블릿이 받았는지' 확인하는 데 씀)
   int cmdCount = 0;
@@ -411,10 +411,11 @@ class CastService extends ChangeNotifier {
 /// 같은 사진을 여러 번 압축하지 않도록 (체크 목록을 바꿀 때마다 다시 압축하면 느려짐)
 final _jpegCache = Expando<Map<int, String>>();
 
+/// 기본: 긴 변 2048 · 품질 88 (PC 에서 크게 확대해도 덜 흐리게, 2026.11.27-c. 예전 1280 · 80)
 Future<String> jpegBase64(
   Uint8List src, {
-  int maxSide = 1280,
-  int quality = 80,
+  int maxSide = 2048,
+  int quality = 88,
 }) async {
   final cache = _jpegCache[src] ??= {};
   final ck = maxSide * 1000 + quality;

@@ -152,7 +152,10 @@ void main() {
     expect(find.text('7. 저장'), findsOneWidget);
     expect(find.text('정하늘 님'), findsWidgets);
     expect(find.text('＋ 새 작업'), findsWidgets);
-    // ＋ 새 작업 → 빈 1단계
+    // 💾 저장·상담 완료(잠김) 뒤에도 PC ＋ 새 작업 → 빈 1단계
+    send({'t': 'confirmSave'});
+    await _settle(t);
+    expect(find.textContaining('이미 저장'), findsNothing);
     send({'t': 'newCase'});
     await _settle(t);
     expect(find.text('1. 사진 넣기'), findsOneWidget);
