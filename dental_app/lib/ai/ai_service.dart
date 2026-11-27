@@ -268,10 +268,15 @@ class AiError implements Exception {
     final t = e.toString();
     if (t.contains('App Check') ||
         t.contains('app-check') ||
+        t.contains('app_check') ||
         t.contains('appCheck') ||
         t.contains('UNAUTHENTICATED')) {
-      return const AiError(
-        'AI 연결 인증(App Check)이 필요합니다. [AI 연결 설정]의 인증 토큰을 Firebase 콘솔에 등록해 주세요.',
+      // 등록 안 된 토큰으로 여러 번 시도하면 Firebase 가 잠시 막음 (Too many attempts)
+      final many = t.contains('Too many attempts');
+      return AiError(
+        '나노바나나 연결 인증(App Check)이 안 됩니다. 앱을 다시 설치했다면 이 태블릿 인증 토큰이 바뀌었어요.\n'
+        '① [🔑 API 키 설정] ③ 인증 토큰 [복사] → Firebase 콘솔 App Check → 디버그 토큰 관리에 추가'
+        '${many ? '\n② 너무 여러 번 시도해서 잠시 막혔어요. 등록 뒤 앱을 완전히 껐다 켜고, 안 되면 30분쯤 뒤 다시 해 주세요.' : ''}',
       );
     }
     if (t.contains('BILLING') || t.contains('billing')) {
