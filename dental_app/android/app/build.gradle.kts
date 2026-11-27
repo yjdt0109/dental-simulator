@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
@@ -34,11 +36,28 @@ android {
         noCompress.add("task")
     }
 
+    // 고정 서명: android/key.properties (+ .jks) 가 있으면 그 열쇠로, 없으면 임시(debug) 열쇠로 서명.
+    // 열쇠 파일은 저장소에 넣지 않음 (사용자가 보관, 새 세션마다 올려 줌)
+    val keyProps = Properties().apply {
+        val f = rootProject.file("key.properties")
+        if (f.exists()) f.inputStream().use { load(it) }
+    }
+    signingConfigs {
+        if (keyProps.getProperty("storeFile") != null) {
+            create("bna") {
+                storeFile = rootProject.file(keyProps.getProperty("storeFile"))
+                storePassword = keyProps.getProperty("storePassword")
+                keyAlias = keyProps.getProperty("keyAlias")
+                keyPassword = keyProps.getProperty("keyPassword")
+            }
+        }
+    }
+
     buildTypes {
         release {
             // TODO: Add your own signing config for the release build.
             // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.findByName("bna") ?: signingConfigs.getByName("debug")
             // MediaPipe 는 실행 중에 이름으로 부품을 찾으므로 코드 이름 줄이기(R8)를 끔
             isMinifyEnabled = false
             isShrinkResources = false

@@ -21,6 +21,7 @@ export PATH=~/flutter/bin:$PATH
 cd dental_app && flutter pub get
 ```
 안드로이드 빌드에는 Android SDK 가 필요하다 (없으면 설치 후 `flutter build apk --release`).
+**APK 서명**: 빌드 전에 사용자에게 `BnA-앱서명열쇠-보관용.zip`(bna-release.jks, key.properties)을 올려 달라고 해서 `dental_app/android/` 에 푼다. 없이 빌드하면 임시 열쇠로 서명돼 태블릿에서 "패키지 충돌"로 업데이트가 안 된다. 이 파일들은 절대 커밋하지 않는다(.gitignore 됨).
 
 ## 확인 · 전달
 - 바꾼 뒤 `flutter analyze`, `flutter test` 를 돌린다 (모두 통과해야 함).
