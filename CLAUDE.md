@@ -14,7 +14,7 @@
 - `monitor-web/` 상담 PC 모니터 (정적 웹, Netlify). 버전: `index.html` 의 v3.xx, `app.js` 의 "앱 20xx… 이상" 문구
 
 ## 개발 환경 준비 (새 클라우드 세션)
-Flutter SDK 가 없으면 설치한다 (마지막 사용: Flutter 3.47.9 stable):
+Flutter SDK 가 없으면 설치한다 (마지막 사용: Flutter 3.50.1 stable):
 ```bash
 git clone --depth 1 -b stable https://github.com/flutter/flutter.git ~/flutter
 export PATH=~/flutter/bin:$PATH

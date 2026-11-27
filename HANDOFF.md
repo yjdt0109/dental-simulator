@@ -4,7 +4,7 @@
 > "HANDOFF.md 읽고 이어서 작업해줘"라고 하면 됩니다. 답변은 항상 한글로.
 
 ## 1. 현재 버전
-- 태블릿 앱(안드로이드 APK, Flutter): **2026.11.27-a** (⚠ 이 버전은 아직 빌드·테스트 못 함 — 아래 8번 참고) (`lib/cast/cast_service.dart`의 `appVersion`)
+- 태블릿 앱(안드로이드 APK, Flutter): **2026.11.27-a** (analyze·test 확인됨 — 아래 8번 참고) (`lib/cast/cast_service.dart`의 `appVersion`)
 - 상담 PC 모니터(웹, Netlify에 폴더째 끌어다 놓기): **v3.43** (`monitor-web/`)
 - 자동 테스트: 151개 모두 통과 (`flutter test`)
 
@@ -81,6 +81,7 @@ flutter build apk --release   # build/app/outputs/flutter-apk/app-release.apk
 - API 키·비밀번호는 채팅에 붙여넣지 말고 앱 설정에만 입력
 
 ## 8. 알려진 문제·해결 기록
+- **2026-11-27 두 번째 세션**: 네트워크가 풀려 Flutter 3.50.1 설치 → 2026.11.27-a `flutter analyze` 오류·경고 없음(참고 info 51개, material.dart deprecated 등), `flutter test` 151개 모두 통과. Android SDK(cmdline-tools, platform 36, build-tools 36) 설치 후 APK 빌드 진행
 - **2026-11-27 세션**: Flutter 가 Dart SDK 를 받는 주소(storage.googleapis.com)가 이 세션 네트워크에서 막혀(403) `flutter analyze`·`flutter test`·APK 빌드를 못 함. 2026.11.27-a 는 코드만 고쳐 올림 → **다음 세션에서 먼저 analyze·test·APK 빌드 확인할 것**
 - 2026.11.19-b: PC 정밀 매칭에서 "Field platform_ for wz0 not found" → 릴리스 빌드의 코드 이름 줄이기(R8)가 MediaPipe 내부 이름을 바꿔서 생김. `android/app/proguard-rules.pro` 에 MediaPipe·protobuf 보호 규칙 추가 (2026.11.19-c)
 - 2026.11.19-c 에서도 "com.google.mediapipe.framework.Graph" 오류 (Flogger 이름 바뀜) → 릴리스 빌드의 코드 이름 줄이기(R8)를 아예 끔 (`isMinifyEnabled = false`, APK 135MB). 오류 메시지는 원인 사슬 전체를 보여 줌 (2026.11.19-d, PC v3.26 긴 오류 줄바꿈)
