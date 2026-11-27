@@ -1415,8 +1415,20 @@ function camGuideDraw(shot) {
   svg.innerHTML = `<g fill="none" stroke="${col}" stroke-width="${sw}" opacity=".9">
     <line x1="${w * GUIDE.midX}" y1="0" x2="${w * GUIDE.midX}" y2="${h}" stroke-dasharray="${sw * 5} ${sw * 3.5}"/>
     <line x1="${w * 0.12}" y1="${h * GUIDE.eyeY}" x2="${w * 0.88}" y2="${h * GUIDE.eyeY}"/>
+    ${camTicks(w, h, sw, col)}
     ${occ ? `<line x1="${w * 0.3}" y1="${h * GUIDE.occY}" x2="${w * 0.7}" y2="${h * GUIDE.occY}" stroke-dasharray="${sw * 5} ${sw * 3.5}"/>` : ''}
     ${oval ? `<ellipse cx="${w / 2}" cy="${h * GUIDE.ovalCy}" rx="${rx}" ry="${ry}"/>` : ''}</g>`;
+}
+// 눈동자선 눈금 (가로 길이 재기): 가운데부터 2.5% 마다 작은 눈금, 10% 마다 큰 눈금 + 숫자 (태블릿과 같음)
+function camTicks(w, h, sw, col) {
+  const y = h * GUIDE.eyeY, cx = w * GUIDE.midX, step = w * 0.025, u = h / 100;
+  let o = '';
+  for (let i = -15; i <= 15; i++) {
+    const x = cx + step * i, big = i % 4 === 0, len = (big ? 2.4 : 1.2) * u;
+    o += `<line x1="${x}" y1="${y - len}" x2="${x}" y2="${y + len}" stroke-width="${sw * 0.75}"/>`;
+    if (big && i) o += `<text x="${x}" y="${y + len + 2.6 * u}" fill="${col}" stroke="none" font-size="${2.4 * u}" font-weight="800" text-anchor="middle">${Math.abs(i) / 4}</text>`;
+  }
+  return o;
 }
 // ① 윤곽선: 사진 경계선만 하늘색으로 (배경 투명)
 async function camOutline(src) {

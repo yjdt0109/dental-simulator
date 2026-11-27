@@ -554,6 +554,31 @@ class GuidePainter extends CustomPainter {
     dashed(Offset(x, 0), Offset(x, s.height));
     final ey = s.height * GuideGeom.eyeY;
     c.drawLine(Offset(s.width * 0.12, ey), Offset(s.width * 0.88, ey), p);
+    // 눈금 (가로 길이 재기): 가운데부터 양쪽으로 2.5% 마다 작은 눈금, 10% 마다 큰 눈금 + 숫자
+    final tick = Paint()
+      ..color = col.withValues(alpha: 0.9)
+      ..strokeWidth = 1.5;
+    for (var i = -15; i <= 15; i++) {
+      final tx = x + s.width * 0.025 * i;
+      final big = i % 4 == 0;
+      final len = big ? 12.0 : 6.0;
+      c.drawLine(Offset(tx, ey - len), Offset(tx, ey + len), tick);
+      if (big && i != 0) {
+        final tp = TextPainter(
+          text: TextSpan(
+            text: '${i.abs() ~/ 4}',
+            style: TextStyle(
+              color: col,
+              fontSize: 11,
+              fontWeight: FontWeight.w800,
+              shadows: const [Shadow(blurRadius: 2)],
+            ),
+          ),
+          textDirection: TextDirection.ltr,
+        )..layout();
+        tp.paint(c, Offset(tx - tp.width / 2, ey + len + 1));
+      }
+    }
     if (occlusal) {
       final oy = s.height * GuideGeom.occY;
       dashed(Offset(s.width * 0.25, oy), Offset(s.width * 0.75, oy));

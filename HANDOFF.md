@@ -4,9 +4,9 @@
 > "HANDOFF.md 읽고 이어서 작업해줘"라고 하면 됩니다. 답변은 항상 한글로.
 
 ## 1. 현재 버전
-- 태블릿 앱(안드로이드 APK, Flutter): **2026.11.27-i** (고정 열쇠 서명, analyze·test 167개·APK 빌드 확인) (`lib/cast/cast_service.dart`의 `appVersion`)
-- 상담 PC 모니터(웹, Netlify에 폴더째 끌어다 놓기): **v3.46** (`monitor-web/`)
-- 자동 테스트: 167개 모두 통과 (`flutter test`)
+- 태블릿 앱(안드로이드 APK, Flutter): **2026.11.27-j** (고정 열쇠 서명, analyze·test 169개·APK 빌드 확인) (`lib/cast/cast_service.dart`의 `appVersion`)
+- 상담 PC 모니터(웹, Netlify에 폴더째 끌어다 놓기): **v3.47** (`monitor-web/`)
+- 자동 테스트: 169개 모두 통과 (`flutter test`)
 
 ## 2. 구성
 - `dental_app/` — Flutter 앱 (lib, test, android, web)
@@ -55,7 +55,8 @@
    - **PC**: 태블릿이 `slotGhost {s1, s2}`(긴 변 960) 를 보냄. [📷 사진 촬영] 창: 영상 비율 그대로인 무대(`.cam-stage`, `--ar`) 위에 고스트(반투명/윤곽선, 투명도), SVG 가이드선, 자동 확인(MediaPipe tasks-vision 0.10.14 jsdelivr + face_landmarker.task, 눈동자 468·473·코끝 1 → `camPose`/`camCheck` = 태블릿과 같은 기준·문구). 얼굴 인식을 못 불러오면 '가이드선에 맞춰 찍어 주세요'. Playwright 로 가짜 웹캠·로컬 MediaPipe 파일로 확인(이 작업 환경은 jsdelivr 막힘)
    - **실제 기기 확인 필요**: 카메라 미리보기와 찍힌 사진의 화면 비율이 기종에 따라 다르면 고스트가 살짝 어긋날 수 있음(태블릿). 얼굴 인식 방향(센서 각도)도 기기에서 확인
 36. **2026.11.27-i (PC 변경 없음)**: ① 시뮬레이터를 열면 **예시 환자 3명(그림 사진) 없이 빈 자리**(＋ 새 작업과 같은 상태)에서 시작 — `debugSamplePhotos`(기본 false, `test/flutter_test_config.dart` 에서만 true 라 예전 테스트는 예시 사진 그대로). ② 📸 가이드 촬영에 **[셀카] ↔ [뒤 카메라]** 전환(`_flip`, 마지막 선택 기억 `_lastSelfie`). 셀카 화면은 거울처럼 보이므로 고스트·윤곽선을 좌우로 뒤집어 겹치고(`Transform.flip`), 얼굴 판정도 화면 기준으로 뒤집어 비교(`FacePose.mirrored`), 위치 안내는 '휴대폰을 반대쪽으로'(`checkAlign(selfie:)`). 찍힌 사진 자체는 뒤집지 않음(실제 모습)
-37. **상담 PC**: 위 기능 대부분을 마우스로 (SAM, 기준점, 크기 조절, QA, 보관함, 기록, 미소)
+37. **2026.11.27-j / PC v3.47**: ① 📸 가이드 촬영 눈동자 수평선에 **눈금**(가운데부터 화면 폭 2.5% 마다 작은 눈금, 10% 마다 큰 눈금 + 숫자 1·2·3, 태블릿 `GuidePainter`·PC `camTicks`). ② **Final Smile 입술이 이상하게 나오던 것** 수정 — 원인 추정: (가) AI 결과의 비율·위치가 원본과 달라 늘려 붙이면 입술 안쪽에 AI 입술이 어긋나 겹침, (나) AI 가 입을 더 다물게 그리면 원래 열린 곳 가장자리에 AI 입술 색이 들어옴. → `fitAiToSource`(비율 다르면 cover 로 잘라 맞춤 + `alignAiToSource` 로 밀림·확대 되돌림) + `composeFinalSmile`(입 벌어진 곳 가장자리 띠 = 폭 8%·높이 30% 중 작은 쪽, 거기서 AI 가 입술 색인데 원본은 입술이 아니면 원본 픽셀). 바깥은 전처럼 원본 1. 실제 사진으로 확인 필요
+38. **상담 PC**: 위 기능 대부분을 마우스로 (SAM, 기준점, 크기 조절, QA, 보관함, 기록, 미소)
 
 ## 4. 마지막 대화에서 논의 중이던 것 (다음 할 일)
 - ③·② 넣음(2026.11.25-f) → 사용자 실제 테스트 결과 대기. 남은 제안: ④ 일반 라미네이트·크라운에도 원하는 절단선 지정, 경계 자동 검사(차이 크면 재시도)
@@ -79,7 +80,7 @@ flutter pub get
 flutter test
 flutter build apk --release   # build/app/outputs/flutter-apk/app-release.apk
 ```
-- PC 모니터: `monitor-web` 폴더를 Netlify에 그대로 올림 (사용자에게는 `monitor-web-v3.xx.zip` 으로 묶어 전달). 새 버전 만들 때 index.html의 버전(지금 3.46)을 올림
+- PC 모니터: `monitor-web` 폴더를 Netlify에 그대로 올림 (사용자에게는 `monitor-web-v3.xx.zip` 으로 묶어 전달). 새 버전 만들 때 index.html의 버전(지금 3.47)을 올림
 - 버전 올리기: `lib/cast/cast_service.dart`의 `appVersion` + PC `app.js` 안의 "2026.11.26-c 이상" 문구
 
 ## 6. 주요 파일

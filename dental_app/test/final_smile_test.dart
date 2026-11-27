@@ -39,6 +39,90 @@ Future<void> _settle(WidgetTester t, {bool Function()? until}) async {
 }
 
 void main() {
+  test('Final Smile 합성: AI 가 입을 더 다물게(입술 색) 그려도 입 가장자리는 원본 모양, 가운데는 AI 치아', () {
+    // 원본: 피부(200,160,140) 위 입술(180,70,80) 안에 입 벌어진 곳(밝은 치아 230,225,215)
+    final src = img.Image(width: 200, height: 160)
+      ..clear(img.ColorRgb8(200, 160, 140));
+    img.fillRect(
+      src,
+      x1: 40,
+      y1: 50,
+      x2: 160,
+      y2: 110,
+      color: img.ColorRgb8(180, 70, 80),
+    );
+    img.fillRect(
+      src,
+      x1: 60,
+      y1: 65,
+      x2: 140,
+      y2: 95,
+      color: img.ColorRgb8(230, 225, 215),
+    );
+    // AI: 입술이 안쪽으로 6px 두꺼워짐(입을 더 다묾) + 새 치아 색(250,250,245)
+    final ai = img.Image(width: 200, height: 160)
+      ..clear(img.ColorRgb8(200, 160, 140));
+    img.fillRect(
+      ai,
+      x1: 40,
+      y1: 50,
+      x2: 160,
+      y2: 110,
+      color: img.ColorRgb8(180, 70, 80),
+    );
+    img.fillRect(
+      ai,
+      x1: 66,
+      y1: 71,
+      x2: 134,
+      y2: 89,
+      color: img.ColorRgb8(250, 250, 245),
+    );
+    const poly = [
+      Offset(0.30, 0.40625),
+      Offset(0.70, 0.40625),
+      Offset(0.70, 0.59375),
+      Offset(0.30, 0.59375),
+    ];
+    final out = img.decodeJpg(composeFinalSmile((src, ai, poly)))!;
+    // 가장자리 띠(원래 열린 곳인데 AI 는 입술) → 원본(밝은 치아), 입술 색이 아님
+    final edge = out.getPixel(62, 80);
+    expect(edge.r - edge.g, lessThan(30), reason: '입 가장자리에 AI 입술이 들어옴');
+    // 가운데는 AI 새 치아
+    expect(out.getPixel(100, 80).b, greaterThan(235));
+    // 바깥 입술·피부는 원본
+    expect(out.getPixel(50, 55).g, closeTo(70, 12));
+    expect(out.getPixel(10, 10).r, closeTo(200, 8));
+  });
+
+  test('Final Smile: AI 가 정사각형으로 돌려줘도 늘이지 않고 잘라 맞춤', () {
+    final src = img.Image(width: 120, height: 160)
+      ..clear(img.ColorRgb8(90, 90, 90));
+    img.fillCircle(
+      src,
+      x: 60,
+      y: 80,
+      radius: 30,
+      color: img.ColorRgb8(240, 240, 240),
+    );
+    // 같은 장면을 정사각형(160x160, 좌우 여백)으로
+    final ai = img.Image(width: 160, height: 160)
+      ..clear(img.ColorRgb8(90, 90, 90));
+    img.fillCircle(
+      ai,
+      x: 80,
+      y: 80,
+      radius: 30,
+      color: img.ColorRgb8(240, 240, 240),
+    );
+    final f = fitAiToSource(src, ai);
+    expect(f.width, 120);
+    expect(f.height, 160);
+    expect(f.getPixel(60, 80).r, greaterThan(200)); // 원 가운데 그대로
+    expect(f.getPixel(60, 80 - 36).r, lessThan(120)); // 원이 세로로 늘어나지 않음
+    expect(f.getPixel(60 - 26, 80).r, greaterThan(200)); // 가로로 찌그러지지 않음
+  });
+
   testWidgets('🆕 Final Smile: 길이 유지 지시 · 다시 만들기 · 이어서 다듬기 · 추가 요청', (t) async {
     debugStepFlowOff = false;
     addTearDown(() => debugStepFlowOff = true);

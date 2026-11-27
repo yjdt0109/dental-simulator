@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math' as math;
 import 'dart:ui' show Offset;
 
 import 'package:flutter/foundation.dart';
@@ -10,7 +11,7 @@ import '../privacy/mouth_finder.dart';
 import 'ai_service.dart';
 import 'pipeline.dart';
 import 'smile.dart' show dilate, polygonMask;
-import 'tooth_select.dart' show protectOutside;
+import 'align_fix.dart' show alignAiToSource;
 
 // -----------------------------------------------------------------------------
 // 2단계: Final Smile Simulation
@@ -200,19 +201,96 @@ Future<({Uint8List image, bool lipsLocked})> makeFinalSmile({
   } catch (_) {
     poly = null;
   }
+  final o = img.decodeImage(out);
+  if (o == null) throw const PipelineError('2단계 결과 이미지를 읽지 못했습니다.');
+  // AI 결과를 원본 1 에 정확히 맞춤 (비율이 다르면 늘이지 않고 잘라 맞춘 뒤, 밀림·확대 되돌림)
+  final fitted = await compute((a) => fitAiToSource(a.$1, a.$2), (src, o));
   if (poly == null || poly.length < 3) {
-    // 입술을 못 찾으면 AI 결과를 원본 1 크기로만 맞춤
-    final o = img.decodeImage(out);
-    if (o == null) throw const PipelineError('2단계 결과 이미지를 읽지 못했습니다.');
-    final r = (o.width == src.width && o.height == src.height)
-        ? o
-        : img.copyResize(o, width: src.width, height: src.height);
-    return (image: img.encodeJpg(r, quality: 92), lipsLocked: false);
+    // 입술을 못 찾으면 위치만 맞춤
+    return (image: img.encodeJpg(fitted, quality: 92), lipsLocked: false);
   }
-  final mask = await compute((p) {
-    final m = polygonMask(p.$1, p.$2, p.$3);
-    return dilate(m, (p.$1 * 0.004).ceil() + 1); // 입술 안쪽 + 아주 얇은 경계
-  }, (src.width, src.height, poly));
-  final fixed = await compute(protectOutside, (src, out, mask));
+  final fixed = await compute(composeFinalSmile, (src, fitted, poly));
   return (image: fixed, lipsLocked: true);
+}
+
+/// AI 결과 → 원본 크기·위치에 맞춤. 비율이 다르면(정사각형 등) 늘이지 않고 가득 채워 가운데를 자름(cover),
+/// 그다음 얼굴·입술·배경 기준으로 밀림·확대를 되돌림 ([alignAiToSource])
+img.Image fitAiToSource(img.Image src, img.Image ai) {
+  var a = ai;
+  if (a.width != src.width || a.height != src.height) {
+    final k = math.max(src.width / a.width, src.height / a.height);
+    final w = (a.width * k).round(), h = (a.height * k).round();
+    a = img.copyResize(
+      a,
+      width: w,
+      height: h,
+      interpolation: img.Interpolation.cubic,
+    );
+    a = img.copyCrop(
+      a,
+      x: ((w - src.width) / 2).round(),
+      y: ((h - src.height) / 2).round(),
+      width: src.width,
+      height: src.height,
+    );
+  }
+  return alignAiToSource(src, a).image;
+}
+
+/// 입술·잇몸처럼 붉은 색인지 (치아=밝고 무채색, 입 안=어두움)
+bool _lipLike(num r, num g, num b) => r >= 90 && r - g >= 35 && r - b >= 20;
+
+/// Final Smile 합성: 입술 사이(입 벌어진 곳)만 AI, 바깥은 원본 1.
+/// 입 벌어진 곳 가장자리 띠(폭 8%·높이 30% 중 작은 쪽)에서 AI 가 입술 색을 그렸는데 원본은 입술이 아니면
+/// (= AI 가 입을 더 다물게 그림) 원본 픽셀을 씀 → 입술 모양·두께는 원본 그대로 (2026.11.27-j)
+Uint8List composeFinalSmile((img.Image, img.Image, List<Offset>) a) {
+  final (src, ai, poly) = a;
+  final w = src.width, h = src.height;
+  final region = dilate(polygonMask(w, h, poly), (w * 0.004).ceil() + 1);
+  var minX = 1.0, maxX = 0.0, minY = 1.0, maxY = 0.0;
+  for (final p in poly) {
+    minX = math.min(minX, p.dx);
+    maxX = math.max(maxX, p.dx);
+    minY = math.min(minY, p.dy);
+    maxY = math.max(maxY, p.dy);
+  }
+  // 띠 두께: 입 벌어진 폭의 8% · 높이의 30% 중 작은 쪽 (AI 가 입술을 두껍게 그린 만큼을 덮음)
+  final band = math.max(
+    3,
+    math.min((maxX - minX) * w * 0.08, (maxY - minY) * h * 0.3).round(),
+  );
+  // 안쪽(띠 제외) = 반전 마스크를 띠만큼 넓혀 다시 반전
+  final inv = img.Image(width: w, height: h, numChannels: 1);
+  for (final px in region) {
+    inv.setPixelR(px.x, px.y, px.r > 127 ? 0 : 255);
+  }
+  final grownOut = dilate(inv, band);
+  final soft = img.gaussianBlur(region.clone(), radius: 2);
+  final out = ai.clone();
+  for (var y = 0; y < h; y++) {
+    for (var x = 0; x < w; x++) {
+      final m = soft.getPixel(x, y).r / 255.0;
+      final s = src.getPixel(x, y);
+      if (m <= 0.001) {
+        out.setPixelRgb(x, y, s.r, s.g, s.b);
+        continue;
+      }
+      var r = ai.getPixel(x, y);
+      num rr = r.r, rg = r.g, rb = r.b;
+      final inBand = grownOut.getPixel(x, y).r > 127; // 가장자리 띠
+      if (inBand && _lipLike(rr, rg, rb) && !_lipLike(s.r, s.g, s.b)) {
+        rr = s.r;
+        rg = s.g;
+        rb = s.b;
+      }
+      out.setPixelRgb(
+        x,
+        y,
+        (s.r * (1 - m) + rr * m).round(),
+        (s.g * (1 - m) + rg * m).round(),
+        (s.b * (1 - m) + rb * m).round(),
+      );
+    }
+  }
+  return img.encodeJpg(out, quality: 92);
 }
