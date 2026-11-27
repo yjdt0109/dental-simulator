@@ -3121,7 +3121,7 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
     if (r.aiBlend) {
       setState(() => _libBusy = true);
       try {
-        out = await _libraryBlend(base, r.image, r.lips);
+        out = await _libraryBlend(r.image, r.mask);
         engine = '$engine + AI';
       } catch (e) {
         _toast('AI 로 다듬지 못해 라이브러리 합성 그대로 넣었어요 ($e)');
@@ -3139,14 +3139,11 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
     _toast('📐 6전치 라이브러리 결과를 ${_label(p, p.results.length)}(으)로 추가했습니다');
   }
 
-  /// 라이브러리 합성 → AI 로 조명·질감만 (모양·위치 유지) → 입술 밖은 원본, 입술 모양 보호
-  Future<Uint8List> _libraryBlend(
-    Uint8List base,
-    Uint8List comp,
-    List<Offset>? lips,
-  ) async {
+  /// 라이브러리 합성 → AI 로 조명·질감만 → **라이브러리 치아 윤곽(마스크) 안에서만** AI 결과를 씀
+  /// (윤곽 밖은 합성 사진 그대로 → AI 가 치아를 길게 그려도 길이는 라이브러리 그대로, 2026.11.27-l)
+  Future<Uint8List> _libraryBlend(Uint8List comp, Uint8List mask) async {
     final s = PipelineSettings.instance;
-    final src = await AiService.decodePhoto(base, maxSide: 2000);
+    final full = await AiService.decodePhoto(comp, maxSide: 6000);
     final cj = await AiService.photoJpeg(
       await AiService.decodePhoto(comp, maxSide: 2000),
     );
@@ -3172,11 +3169,9 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
     }
     final o = img.decodeImage(ai);
     if (o == null) throw const AiError('AI 결과를 읽지 못했습니다');
-    final fitted = await compute((a) => fitAiToSource(a.$1, a.$2), (src, o));
-    if (lips == null || lips.length < 3) {
-      return img.encodeJpg(fitted, quality: 92);
-    }
-    return compute(composeFinalSmile, (src, fitted, lips));
+    final m = img.decodePng(mask);
+    if (m == null) throw const AiError('치아 윤곽을 읽지 못했습니다');
+    return compute(blendInsideMask, (full, o, m));
   }
 
   Future<void> _openLiquify(PatientPhoto p) async {

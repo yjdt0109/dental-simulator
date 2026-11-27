@@ -236,7 +236,67 @@ Path toothPath(Rect r, ToothForm f, int kind, bool mesialRight) {
 
 Color _mix(Color a, Color b, double t) => Color.lerp(a, b, t)!;
 
-/// 6전치 그리기 (사진 픽셀 좌표의 캔버스에). [clip] 이 있으면 그 안에서만 (입술 안쪽)
+/// 치아 하나만 따로 옮기기·크기 (사진 픽셀, 배율). 크기는 잇몸 쪽 가운데를 기준으로
+class ToothAdj {
+  const ToothAdj({this.dx = 0, this.dy = 0, this.sw = 1, this.sh = 1});
+  final double dx, dy, sw, sh;
+  bool get isZero => dx == 0 && dy == 0 && sw == 1 && sh == 1;
+  ToothAdj copyWith({double? dx, double? dy, double? sw, double? sh}) =>
+      ToothAdj(
+        dx: dx ?? this.dx,
+        dy: dy ?? this.dy,
+        sw: sw ?? this.sw,
+        sh: sh ?? this.sh,
+      );
+  Rect apply(Rect r) {
+    final w = r.width * sw, h = r.height * sh;
+    return Rect.fromLTWH(r.center.dx - w / 2 + dx, r.top + dy, w, h);
+  }
+}
+
+/// 내 라이브러리 (실제 치아 사진 · STL 렌더링 PNG): 치아 번호 → 배경 투명 이미지 (치아에 딱 맞게 자른 것)
+class CustomLibrary {
+  CustomLibrary(this.name, this.images);
+  final String name;
+  final Map<int, ui.Image> images;
+
+  /// 이 치아의 그림 (없으면 반대쪽 같은 치아를 좌우로 뒤집어 씀)
+  (ui.Image, bool)? imageFor(int fdi) {
+    final im = images[fdi];
+    if (im != null) return (im, false);
+    final mirror = fdi < 20 ? fdi + 10 : fdi - 10;
+    final m = images[mirror];
+    return m == null ? null : (m, true);
+  }
+}
+
+/// 실제로 그려질 치아 자리 (골라 둔 치아 · 치아별 조절 · 내 라이브러리 비율 반영)
+List<ToothSlot> placedSlots(
+  LibraryPlacement pl,
+  ToothForm f, {
+  Set<int>? teeth,
+  Map<int, ToothAdj> adj = const {},
+  CustomLibrary? custom,
+}) {
+  final out = <ToothSlot>[];
+  for (final s in librarySlots(pl, f)) {
+    if (teeth != null && !teeth.contains(s.fdi)) continue;
+    var r = s.rect;
+    final im = custom?.imageFor(s.fdi);
+    if (im != null) {
+      // 사진 치아는 그 사진의 가로세로 비율 그대로 (길이 배율만)
+      final h = r.width * im.$1.height / im.$1.width * pl.length;
+      r = Rect.fromLTWH(r.left, r.top, r.width, h);
+    }
+    r = (adj[s.fdi] ?? const ToothAdj()).apply(r);
+    out.add(ToothSlot(s.fdi, r, s.kind, s.mesialRight, s.tilt));
+  }
+  return out;
+}
+
+/// 6전치 그리기 (사진 픽셀 좌표의 캔버스에). [clip] 이 있으면 그 안에서만 (입술 안쪽).
+/// [teeth]: 그릴 치아만 (null = 6개 모두), [adj]: 치아별 조절, [custom]: 내 라이브러리 사진,
+/// [mask]: 치아 모양만 흰색으로 (AI 결과를 이 안에서만 쓰기 위한 윤곽), [highlight]: 고른 치아 테두리
 void paintLibrary(
   Canvas c,
   LibraryPlacement pl,
@@ -244,6 +304,11 @@ void paintLibrary(
   Color shade, {
   Path? clip,
   double opacity = 1,
+  Set<int>? teeth,
+  Map<int, ToothAdj> adj = const {},
+  CustomLibrary? custom,
+  bool mask = false,
+  int? highlight,
 }) {
   c.save();
   if (clip != null) c.clipPath(clip);
@@ -253,122 +318,206 @@ void paintLibrary(
   c.translate(pl.center.dx, pl.center.dy);
   c.rotate(pl.rotation * math.pi / 180);
   c.translate(-pl.center.dx, -pl.center.dy);
-  const enamelBlue = Color(0xFFB4BECB);
-  const cervYellow = Color(0xFFD9B98A);
-  for (final s in librarySlots(pl, f)) {
+  for (final s in placedSlots(pl, f, teeth: teeth, adj: adj, custom: custom)) {
     final r = s.rect;
     c.save();
     c.translate(r.center.dx, r.top);
     c.rotate(s.tilt * math.pi / 180);
     c.translate(-r.center.dx, -r.top);
-    final path = toothPath(r, f, s.kind, s.mesialRight);
-    // 뒤쪽 치아는 조금 어둡게 (깊이감)
-    final base = _mix(
-      shade,
-      Colors.black,
-      s.kind == 3 ? 0.10 : (s.kind == 2 ? 0.04 : 0),
-    );
-    // 그림자 (치아 사이 깊이)
-    c.drawPath(
-      path.shift(Offset(0, r.height * 0.01)),
-      Paint()
-        ..color = const Color(0x55000000)
-        ..maskFilter = MaskFilter.blur(BlurStyle.normal, r.width * 0.04),
-    );
-    c.save();
-    c.clipPath(path);
-    // ① 위→아래: 잇몸 쪽 노란기 · 몸통 · 절단끝 반투명(푸른 회색)
-    c.drawRect(
-      r.inflate(2),
-      Paint()
-        ..shader = ui.Gradient.linear(
-          r.topCenter,
-          r.bottomCenter,
-          [
-            _mix(base, cervYellow, 0.45),
-            _mix(base, cervYellow, 0.12),
-            base,
-            _mix(base, Colors.white, 0.10),
-            _mix(base, enamelBlue, 0.55),
-          ],
-          const [0, 0.25, 0.55, 0.82, 1],
-        ),
-    );
-    // ② 좌우 굴곡 그림자 (가장자리가 둥글게 넘어감) — 견치는 바깥쪽이 더 어두움
-    final outer = s.kind == 3 ? 0.42 : 0.26;
-    final inner = s.kind == 3 ? 0.12 : 0.20;
-    c.drawRect(
-      r.inflate(2),
-      Paint()
-        ..shader = ui.Gradient.linear(
-          r.centerLeft,
-          r.centerRight,
-          [
-            Color.fromRGBO(60, 40, 30, s.mesialRight ? outer : inner),
-            const Color(0x00000000),
-            const Color(0x00000000),
-            Color.fromRGBO(60, 40, 30, s.mesialRight ? inner : outer),
-          ],
-          const [0, 0.22, 0.78, 1],
-        ),
-    );
-    // ③ 잇몸 쪽 그늘
-    c.drawRect(
-      Rect.fromLTWH(r.left, r.top - 2, r.width, r.height * 0.16),
-      Paint()
-        ..shader = ui.Gradient.linear(
-          r.topCenter,
-          Offset(r.center.dx, r.top + r.height * 0.16),
-          [const Color(0x55603A20), const Color(0x00603A20)],
-        ),
-    );
-    // ④ 빛 반사 (세로 띠)
-    final hx = s.mesialRight
-        ? r.left + r.width * 0.58
-        : r.left + r.width * 0.42;
-    c.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromCenter(
-          center: Offset(hx, r.top + r.height * 0.45),
-          width: r.width * 0.16,
-          height: r.height * 0.55,
-        ),
-        Radius.circular(r.width * 0.08),
-      ),
-      Paint()
-        ..color = const Color(0x55FFFFFF)
-        ..maskFilter = MaskFilter.blur(BlurStyle.normal, r.width * 0.06),
-    );
-    // ⑤ 발육엽 (젊은 형)
-    if (f.mamelons && s.kind != 3) {
-      for (final fx in const [0.33, 0.66]) {
-        c.drawLine(
-          Offset(r.left + r.width * fx, r.top + r.height * 0.62),
-          Offset(r.left + r.width * fx, r.bottom - r.height * 0.03),
-          Paint()
-            ..color = const Color(0x22FFFFFF)
-            ..strokeWidth = r.width * 0.07
-            ..maskFilter = MaskFilter.blur(BlurStyle.normal, r.width * 0.04),
-        );
+    final im = custom?.imageFor(s.fdi);
+    if (im != null) {
+      _paintImageTooth(c, r, im.$1, im.$2, mask);
+    } else {
+      final path = toothPath(r, f, s.kind, s.mesialRight);
+      if (mask) {
+        c.drawPath(path, Paint()..color = Colors.white);
+      } else {
+        _paintVectorTooth(c, r, path, s, f, shade);
       }
     }
-    c.restore();
-    // ⑥ 윤곽 (치아 사이 경계)
-    c.drawPath(
-      path,
-      Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = math.max(1, r.width * 0.018)
-        ..color = _mix(
-          base,
-          const Color(0xFF6B5040),
-          0.6,
-        ).withValues(alpha: 0.45),
-    );
+    if (highlight == s.fdi && !mask) {
+      c.drawRect(
+        r.inflate(r.width * 0.04),
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = math.max(1.5, r.width * 0.025)
+          ..color = const Color(0xFF1E88FF),
+      );
+    }
     c.restore();
   }
   if (opacity < 1) c.restore();
   c.restore();
+}
+
+void _paintImageTooth(Canvas c, Rect r, ui.Image im, bool flip, bool mask) {
+  final src = Rect.fromLTWH(0, 0, im.width.toDouble(), im.height.toDouble());
+  final p = Paint()..filterQuality = FilterQuality.high;
+  if (mask) {
+    p.colorFilter = const ColorFilter.mode(Colors.white, BlendMode.srcIn);
+  }
+  if (flip) {
+    c.save();
+    c.translate(r.center.dx, 0);
+    c.scale(-1, 1);
+    c.translate(-r.center.dx, 0);
+  }
+  c.drawImageRect(im, src, r, p);
+  if (flip) c.restore();
+}
+
+void _paintVectorTooth(
+  Canvas c,
+  Rect r,
+  Path path,
+  ToothSlot s,
+  ToothForm f,
+  Color shade,
+) {
+  const enamelBlue = Color(0xFFB4BECB);
+  const cervYellow = Color(0xFFD9B98A);
+  // 뒤쪽 치아는 조금 어둡게 (깊이감)
+  final base = _mix(
+    shade,
+    Colors.black,
+    s.kind == 3 ? 0.10 : (s.kind == 2 ? 0.04 : 0),
+  );
+  // 그림자 (치아 사이 깊이)
+  c.drawPath(
+    path.shift(Offset(0, r.height * 0.01)),
+    Paint()
+      ..color = const Color(0x55000000)
+      ..maskFilter = MaskFilter.blur(BlurStyle.normal, r.width * 0.04),
+  );
+  c.save();
+  c.clipPath(path);
+  // ① 위→아래: 잇몸 쪽 노란기 · 몸통 · 절단끝 반투명(푸른 회색)
+  c.drawRect(
+    r.inflate(2),
+    Paint()
+      ..shader = ui.Gradient.linear(
+        r.topCenter,
+        r.bottomCenter,
+        [
+          _mix(base, cervYellow, 0.45),
+          _mix(base, cervYellow, 0.12),
+          base,
+          _mix(base, Colors.white, 0.10),
+          _mix(base, enamelBlue, 0.55),
+        ],
+        const [0, 0.25, 0.55, 0.82, 1],
+      ),
+  );
+  // ② 볼록한 면 (가운데 밝고 가장자리로 갈수록 넘어감)
+  c.drawRect(
+    r.inflate(2),
+    Paint()
+      ..shader = ui.Gradient.radial(
+        Offset(
+          r.left + r.width * (s.mesialRight ? 0.56 : 0.44),
+          r.top + r.height * 0.42,
+        ),
+        r.width * 0.75,
+        [
+          const Color(0x1AFFFFFF),
+          const Color(0x00FFFFFF),
+          const Color(0x33402818),
+        ],
+        const [0, 0.55, 1],
+      ),
+  );
+  // ③ 좌우 굴곡 그림자 + 선각(line angle) — 견치는 바깥쪽이 더 어두움
+  final outer = s.kind == 3 ? 0.42 : 0.26;
+  final inner = s.kind == 3 ? 0.12 : 0.20;
+  c.drawRect(
+    r.inflate(2),
+    Paint()
+      ..shader = ui.Gradient.linear(
+        r.centerLeft,
+        r.centerRight,
+        [
+          Color.fromRGBO(60, 40, 30, s.mesialRight ? outer : inner),
+          Color.fromRGBO(60, 40, 30, (s.mesialRight ? outer : inner) * 0.25),
+          const Color(0x00000000),
+          const Color(0x00000000),
+          Color.fromRGBO(60, 40, 30, (s.mesialRight ? inner : outer) * 0.25),
+          Color.fromRGBO(60, 40, 30, s.mesialRight ? inner : outer),
+        ],
+        const [0, 0.14, 0.24, 0.76, 0.86, 1],
+      ),
+  );
+  // ④ 잇몸 쪽 그늘
+  c.drawRect(
+    Rect.fromLTWH(r.left, r.top - 2, r.width, r.height * 0.16),
+    Paint()
+      ..shader = ui.Gradient.linear(
+        r.topCenter,
+        Offset(r.center.dx, r.top + r.height * 0.16),
+        [const Color(0x55603A20), const Color(0x00603A20)],
+      ),
+  );
+  // ⑤ 법랑질 가로 결 (아주 옅게)
+  final perik = Paint()
+    ..color = const Color(0x06000000)
+    ..strokeWidth = math.max(0.6, r.height * 0.004)
+    ..maskFilter = MaskFilter.blur(
+      BlurStyle.normal,
+      math.max(0.5, r.height * 0.004),
+    );
+  for (var t = 0.25; t < 0.75; t += 0.09) {
+    final y = r.top + r.height * t;
+    c.drawLine(Offset(r.left, y), Offset(r.right, y + r.height * 0.01), perik);
+  }
+  // ⑥ 빛 반사 (세로 띠)
+  final hx = s.mesialRight ? r.left + r.width * 0.58 : r.left + r.width * 0.42;
+  c.drawRRect(
+    RRect.fromRectAndRadius(
+      Rect.fromCenter(
+        center: Offset(hx, r.top + r.height * 0.45),
+        width: r.width * 0.16,
+        height: r.height * 0.55,
+      ),
+      Radius.circular(r.width * 0.08),
+    ),
+    Paint()
+      ..color = const Color(0x55FFFFFF)
+      ..maskFilter = MaskFilter.blur(BlurStyle.normal, r.width * 0.06),
+  );
+  // ⑦ 발육엽 (젊은 형)
+  if (f.mamelons && s.kind != 3) {
+    for (final fx in const [0.33, 0.66]) {
+      c.drawLine(
+        Offset(r.left + r.width * fx, r.top + r.height * 0.62),
+        Offset(r.left + r.width * fx, r.bottom - r.height * 0.03),
+        Paint()
+          ..color = const Color(0x22FFFFFF)
+          ..strokeWidth = r.width * 0.07
+          ..maskFilter = MaskFilter.blur(BlurStyle.normal, r.width * 0.04),
+      );
+    }
+  }
+  // ⑧ 절단끝 헤일로 (가장자리의 얇고 밝은 선)
+  c.drawLine(
+    Offset(r.left + r.width * 0.12, r.bottom - r.height * 0.012),
+    Offset(r.right - r.width * 0.12, r.bottom - r.height * 0.012),
+    Paint()
+      ..color = const Color(0x40FFFFFF)
+      ..strokeWidth = math.max(1, r.height * 0.018)
+      ..maskFilter = MaskFilter.blur(BlurStyle.normal, r.height * 0.008),
+  );
+  c.restore();
+  // ⑨ 윤곽 (치아 사이 경계)
+  c.drawPath(
+    path,
+    Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = math.max(1, r.width * 0.018)
+      ..color = _mix(
+        base,
+        const Color(0xFF6B5040),
+        0.6,
+      ).withValues(alpha: 0.45),
+  );
 }
 
 /// 라이브러리 미리보기 그림 (모양 고르기 칩용)

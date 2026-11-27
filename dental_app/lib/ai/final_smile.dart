@@ -41,7 +41,8 @@ const kFinalSmileKeepLength =
 const kLibraryBlendPrompt =
     'This is a dental smile-design mock-up: idealized upper front teeth from a tooth library were placed on the patient photo. '
     'Make it look like one real clinical photograph. Keep the exact shape, outline, size, length, width, position and '
-    'arrangement of every placed tooth (do not redesign the teeth), keep the lips, gums, face, background and framing unchanged. '
+    'arrangement of every placed tooth (do not redesign the teeth, do NOT make any tooth longer or shorter, keep the incisal edges exactly where they are), '
+    'keep the lips, gums, face, background and framing unchanged. '
     'Only add realistic enamel texture, translucency at the incisal edges, natural surface reflections, the soft shadows '
     'of the lips and the mouth interior, and match the lighting, color temperature and photo grain of the photo. '
     'Blend the tooth edges naturally with the gums. Photorealistic, no text.';
@@ -244,6 +245,35 @@ img.Image fitAiToSource(img.Image src, img.Image ai) {
     );
   }
   return alignAiToSource(src, a).image;
+}
+
+/// 📐 라이브러리 + AI: AI 결과를 합성 사진에 맞춘 뒤 [mask](흰색 = 라이브러리 치아) 안에서만 씀.
+/// 윤곽 가장자리 2px 만 부드럽게 섞음 → 치아 길이·모양은 라이브러리 그대로
+Uint8List blendInsideMask((img.Image, img.Image, img.Image) a) {
+  final (comp, ai0, mask0) = a;
+  final ai = fitAiToSource(comp, ai0);
+  var mask = mask0;
+  if (mask.width != comp.width || mask.height != comp.height) {
+    mask = img.copyResize(mask, width: comp.width, height: comp.height);
+  }
+  // 바깥으로는 넓히지 않고 안쪽으로만 부드럽게 (윤곽 밖으로 AI 가 새어 나가지 않게)
+  final soft = img.gaussianBlur(mask.clone(), radius: 2);
+  final out = comp.clone();
+  for (var y = 0; y < comp.height; y++) {
+    for (var x = 0; x < comp.width; x++) {
+      if (mask.getPixel(x, y).r < 128) continue;
+      final m = math.min(1.0, soft.getPixel(x, y).r / 255.0 * 1.6);
+      final c = comp.getPixel(x, y), r = ai.getPixel(x, y);
+      out.setPixelRgb(
+        x,
+        y,
+        (c.r * (1 - m) + r.r * m).round(),
+        (c.g * (1 - m) + r.g * m).round(),
+        (c.b * (1 - m) + r.b * m).round(),
+      );
+    }
+  }
+  return img.encodeJpg(out, quality: 92);
 }
 
 /// 입술·잇몸처럼 붉은 색인지 (치아=밝고 무채색, 입 안=어두움)
