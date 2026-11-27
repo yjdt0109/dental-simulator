@@ -69,6 +69,12 @@ class _GuidedCameraScreenState extends State<GuidedCameraScreen> {
   bool _busy = false;
   int _lastRun = 0;
   int _rotation = 90;
+  List<CameraDescription> _cams = const [];
+  bool _selfie = _lastSelfie; // 앞(셀카) 카메라
+  static bool _lastSelfie = false; // 다음에 열 때도 같은 카메라
+
+  /// 화면에 보이는 대로의 기준 얼굴 (셀카면 거울처럼 좌우 뒤집음)
+  FacePose? get _refShown => _selfie ? _ref?.mirrored() : _ref;
 
   @override
   void initState() {
@@ -91,12 +97,17 @@ class _GuidedCameraScreenState extends State<GuidedCameraScreen> {
 
   Future<void> _initCamera() async {
     try {
-      final cams = await availableCameras();
+      final cams = _cams.isEmpty ? await availableCameras() : _cams;
       if (cams.isEmpty) throw StateError('카메라를 찾지 못했습니다');
+      _cams = cams;
+      final want = _selfie
+          ? CameraLensDirection.front
+          : CameraLensDirection.back;
       final cam = cams.firstWhere(
-        (c) => c.lensDirection == CameraLensDirection.back,
+        (c) => c.lensDirection == want,
         orElse: () => cams.first,
       );
+      _selfie = cam.lensDirection == CameraLensDirection.front;
       _rotation = cam.sensorOrientation;
       final ctl = CameraController(
         cam,
@@ -161,13 +172,37 @@ class _GuidedCameraScreenState extends State<GuidedCameraScreen> {
       final side = _rotation == 90 || _rotation == 270;
       final w = (side ? f.height : f.width).toDouble();
       final h = (side ? f.width : f.height).toDouble();
-      final pose = poseOfFaces(faces, w, h);
-      if (mounted) setState(() => _align = checkAlign(pose, _ref));
+      final raw = poseOfFaces(faces, w, h);
+      final pose = _selfie ? raw?.mirrored() : raw; // 거울 화면 기준
+      if (mounted) {
+        setState(() => _align = checkAlign(pose, _refShown, selfie: _selfie));
+      }
     } catch (e) {
       debugPrint('face check: $e');
     } finally {
       _busy = false;
     }
+  }
+
+  /// 앞(셀카) ↔ 뒤 카메라 바꾸기
+  Future<void> _flip() async {
+    if (_shooting) return;
+    final old = _ctl;
+    setState(() {
+      _selfie = !_selfie;
+      _lastSelfie = _selfie;
+      _ctl = null;
+      _align = null;
+    });
+    if (old != null) {
+      try {
+        if (old.value.isStreamingImages) await old.stopImageStream();
+      } catch (_) {}
+      await old.dispose();
+    }
+    await _detector?.close();
+    _detector = null;
+    if (debugCameraPreview == null) await _initCamera();
   }
 
   Future<void> _shoot() async {
@@ -260,23 +295,29 @@ class _GuidedCameraScreenState extends State<GuidedCameraScreen> {
                       ClipRect(child: preview),
                       if (ghost != null && _mode == GhostMode.photo)
                         IgnorePointer(
-                          child: Opacity(
-                            opacity: _opacity,
-                            child: Image.memory(
-                              ghost,
-                              fit: BoxFit.cover,
-                              gaplessPlayback: true,
+                          child: Transform.flip(
+                            flipX: _selfie, // 셀카 화면은 거울처럼 보이므로 겹칠 사진도
+                            child: Opacity(
+                              opacity: _opacity,
+                              child: Image.memory(
+                                ghost,
+                                fit: BoxFit.cover,
+                                gaplessPlayback: true,
+                              ),
                             ),
                           ),
                         ),
                       if (_outline != null && _mode == GhostMode.outline)
                         IgnorePointer(
-                          child: Opacity(
-                            opacity: math.min(1, _opacity * 2.2),
-                            child: Image.memory(
-                              _outline!,
-                              fit: BoxFit.cover,
-                              gaplessPlayback: true,
+                          child: Transform.flip(
+                            flipX: _selfie,
+                            child: Opacity(
+                              opacity: math.min(1, _opacity * 2.2),
+                              child: Image.memory(
+                                _outline!,
+                                fit: BoxFit.cover,
+                                gaplessPlayback: true,
+                              ),
                             ),
                           ),
                         ),
@@ -465,7 +506,17 @@ class _GuidedCameraScreenState extends State<GuidedCameraScreen> {
                 ),
               ),
               const Spacer(),
-              const SizedBox(width: 110),
+              SizedBox(
+                width: 110,
+                child: TextButton.icon(
+                  onPressed: _shooting ? null : _flip,
+                  icon: const Icon(
+                    Icons.cameraswitch_rounded,
+                    color: Colors.white,
+                  ),
+                  label: Text(_selfie ? '뒤 카메라' : '셀카', style: white),
+                ),
+              ),
             ],
           ),
         ],

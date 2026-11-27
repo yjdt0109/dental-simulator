@@ -58,6 +58,9 @@ part 'step_flow.dart';
 /// 테스트용: true 면 예전 화면으로 시작 (기존 테스트들은 예전 화면 기준)
 bool debugStepFlowOff = false;
 
+/// 예시 환자 3명(그림 사진)을 넣을지. 평소엔 빈 화면에서 시작 (사용자 요청 2026.11.27-i), 테스트만 켬
+bool debugSamplePhotos = false;
+
 class SimulatorHomeScreen extends StatefulWidget {
   const SimulatorHomeScreen({
     super.key,
@@ -382,7 +385,25 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
   // 데이터
   // ---------------------------------------------------------------------------
   Future<void> _loadSamples() async {
-    // 촬영실 PC 연동 전까지 샘플 3명 (코드로 그린 예시 사진)
+    if (!debugSamplePhotos) {
+      // 빈 자리에서 시작 ([＋ 새 작업] 과 같은 상태, 안내 알림 없이)
+      await Future<void>.delayed(Duration.zero);
+      if (!mounted) return;
+      _uploadSeq++;
+      final p = PatientPhoto(
+        id: 'u$_uploadSeq',
+        name: '새 환자',
+        type: '새 작업',
+        time: '방금',
+        beforeBytes: blankPhoto(),
+        imageSize: const Size(640, 480),
+      )..blank = true;
+      p.consult.name = '';
+      _patients.add(p);
+      _select(p);
+      return;
+    }
+    // (테스트용) 샘플 3명 (코드로 그린 예시 사진)
     final specs = [
       (
         'p1',

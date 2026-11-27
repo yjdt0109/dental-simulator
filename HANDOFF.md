@@ -4,9 +4,9 @@
 > "HANDOFF.md 읽고 이어서 작업해줘"라고 하면 됩니다. 답변은 항상 한글로.
 
 ## 1. 현재 버전
-- 태블릿 앱(안드로이드 APK, Flutter): **2026.11.27-h** (고정 열쇠 서명, analyze·test 165개·APK 빌드 확인) (`lib/cast/cast_service.dart`의 `appVersion`)
+- 태블릿 앱(안드로이드 APK, Flutter): **2026.11.27-i** (고정 열쇠 서명, analyze·test 167개·APK 빌드 확인) (`lib/cast/cast_service.dart`의 `appVersion`)
 - 상담 PC 모니터(웹, Netlify에 폴더째 끌어다 놓기): **v3.46** (`monitor-web/`)
-- 자동 테스트: 165개 모두 통과 (`flutter test`)
+- 자동 테스트: 167개 모두 통과 (`flutter test`)
 
 ## 2. 구성
 - `dental_app/` — Flutter 앱 (lib, test, android, web)
@@ -54,7 +54,8 @@
    - **태블릿·폰**: 새 앱 안 촬영 화면 `lib/capture/guided_camera.dart` (`camera` 패키지 0.12, 후면 카메라, `ResolutionPreset.max`, 세로 고정, NV21 프레임). 원본 카드 [촬영] → 시트에 '원본 k 촬영 (가이드선 · 겹쳐 보기)'(새 화면) / '기본 카메라 앱으로 촬영'(예전 방식, 예비) / 갤러리 / 환자 기록. ① **고스트**: 먼저 찍은 다른 원본(`_ghostFor`: 원본 2 는 눈 가리기 전 `eyeOrig`)을 반투명(기본 35%, 15~70% 막대) 또는 **윤곽선**(`ghostOutline`: 소벨 경계 하늘색 PNG) 또는 끄기. ② **가이드선**(`GuidePainter`, 위치는 `GuideGeom`): 수직 정중선(점선) · 눈동자 수평선 · 얼굴 타원(겹쳐 볼 사진이 없을 때만) · 교합평면선(원본 1 촬영 때만). ③ **실시간 자동 확인**: ML Kit 얼굴 인식(300ms 마다) → `face_align.dart` `checkAlign`: 수평(눈동자선 기울기 ±2.5°)·정면(yaw ±6°)·고개(pitch ±6°, 기준 사진 있을 때만)·거리(눈 사이 ±6%)·위치(±3.5%) — 기준 = 먼저 찍은 사진의 얼굴(`facePoseOfPhoto`), 없으면 화면 가이드. 칩(✓/✕) + 가장 먼저 고칠 것 한 줄(예: '너무 멀어요 · 조금 더 가까이'), 모두 맞으면 초록. 자동 셔터는 아직 안 함(다음 단계 후보). 테스트 `test/guided_camera_test.dart`(`debugCameraPreview`·`debugCameraShot`·`debugLiveAlign`)
    - **PC**: 태블릿이 `slotGhost {s1, s2}`(긴 변 960) 를 보냄. [📷 사진 촬영] 창: 영상 비율 그대로인 무대(`.cam-stage`, `--ar`) 위에 고스트(반투명/윤곽선, 투명도), SVG 가이드선, 자동 확인(MediaPipe tasks-vision 0.10.14 jsdelivr + face_landmarker.task, 눈동자 468·473·코끝 1 → `camPose`/`camCheck` = 태블릿과 같은 기준·문구). 얼굴 인식을 못 불러오면 '가이드선에 맞춰 찍어 주세요'. Playwright 로 가짜 웹캠·로컬 MediaPipe 파일로 확인(이 작업 환경은 jsdelivr 막힘)
    - **실제 기기 확인 필요**: 카메라 미리보기와 찍힌 사진의 화면 비율이 기종에 따라 다르면 고스트가 살짝 어긋날 수 있음(태블릿). 얼굴 인식 방향(센서 각도)도 기기에서 확인
-36. **상담 PC**: 위 기능 대부분을 마우스로 (SAM, 기준점, 크기 조절, QA, 보관함, 기록, 미소)
+36. **2026.11.27-i (PC 변경 없음)**: ① 시뮬레이터를 열면 **예시 환자 3명(그림 사진) 없이 빈 자리**(＋ 새 작업과 같은 상태)에서 시작 — `debugSamplePhotos`(기본 false, `test/flutter_test_config.dart` 에서만 true 라 예전 테스트는 예시 사진 그대로). ② 📸 가이드 촬영에 **[셀카] ↔ [뒤 카메라]** 전환(`_flip`, 마지막 선택 기억 `_lastSelfie`). 셀카 화면은 거울처럼 보이므로 고스트·윤곽선을 좌우로 뒤집어 겹치고(`Transform.flip`), 얼굴 판정도 화면 기준으로 뒤집어 비교(`FacePose.mirrored`), 위치 안내는 '휴대폰을 반대쪽으로'(`checkAlign(selfie:)`). 찍힌 사진 자체는 뒤집지 않음(실제 모습)
+37. **상담 PC**: 위 기능 대부분을 마우스로 (SAM, 기준점, 크기 조절, QA, 보관함, 기록, 미소)
 
 ## 4. 마지막 대화에서 논의 중이던 것 (다음 할 일)
 - ③·② 넣음(2026.11.25-f) → 사용자 실제 테스트 결과 대기. 남은 제안: ④ 일반 라미네이트·크라운에도 원하는 절단선 지정, 경계 자동 검사(차이 크면 재시도)

@@ -108,6 +108,30 @@ void main() {
       expect(r.allOk, isTrue);
     });
 
+    test('셀카(거울 화면): 좌우 뒤집어 비교, 옮길 방향은 반대', () {
+      final m = pose(0.30, 0.40, 0.50, 0.42, yaw: 5).mirrored();
+      expect(m.eyeA.dx, closeTo(0.50, 1e-9));
+      expect(m.eyeB.dx, closeTo(0.70, 1e-9));
+      expect(m.yaw, -5);
+      expect(m.roll, lessThan(0)); // 기울기 방향도 뒤집힘
+      final r = checkAlign(
+        pose(0.46, 0.40, 0.70, 0.40, yaw: 0, pitch: 2),
+        ref,
+        selfie: true,
+      );
+      final hint = r.items.firstWhere((i) => i.label == '위치').hint;
+      expect(hint, contains('화면 오른쪽'));
+      expect(hint, contains('휴대폰을 왼쪽으로'));
+      final back = checkAlign(
+        pose(0.46, 0.40, 0.70, 0.40, yaw: 0, pitch: 2),
+        ref,
+      );
+      expect(
+        back.items.firstWhere((i) => i.label == '위치').hint,
+        contains('카메라를 오른쪽으로'),
+      );
+    });
+
     test('얼굴 없음', () {
       final r = checkAlign(null, ref);
       expect(r.face, isFalse);
@@ -191,6 +215,22 @@ void main() {
       ),
       findsNothing,
     );
+    // 셀카 ↔ 뒤 카메라: 겹칠 사진도 거울처럼 뒤집힘
+    await t.tap(find.text('끄기').first); // (이미 끔) 버튼 위치 유지
+    await t.tap(find.text('반투명 사진'));
+    await t.pump();
+    expect(find.text('셀카'), findsOneWidget);
+    await t.tap(find.text('셀카'));
+    await t.pump();
+    expect(find.text('뒤 카메라'), findsOneWidget);
+    expect(
+      t
+          .widgetList<Transform>(find.byType(Transform))
+          .any((w) => w.transform.storage[0] == -1),
+      isTrue,
+    );
+    await t.tap(find.text('뒤 카메라'));
+    await t.pump();
     await t.tap(find.bySemanticsLabel('촬영'));
     await t.pumpAndSettle();
     expect(got, same(shot));

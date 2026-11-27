@@ -45,6 +45,15 @@ class FacePose {
       ? FacePose(eyeA: e1, eyeB: e2, nose: nose, yaw: yaw, pitch: pitch)
       : FacePose(eyeA: e2, eyeB: e1, nose: nose, yaw: yaw, pitch: pitch);
 
+  /// 좌우 뒤집기 (셀카 화면은 거울처럼 보이므로 화면 기준으로 맞춤)
+  FacePose mirrored() => FacePose.fromEyes(
+    Offset(1 - eyeA.dx, eyeA.dy),
+    Offset(1 - eyeB.dx, eyeB.dy),
+    nose: nose == null ? null : Offset(1 - nose!.dx, nose!.dy),
+    yaw: yaw == null ? null : -yaw!,
+    pitch: pitch,
+  );
+
   Offset get eyeMid => (eyeA + eyeB) / 2;
   double get eyeDist => (eyeB - eyeA).distance;
 
@@ -84,8 +93,9 @@ class AlignTol {
   static const pos = 0.035; // 눈 가운데 위치 (화면 비율)
 }
 
-/// [live]: 지금 카메라 얼굴, [ref]: 먼저 찍은 사진 얼굴 (없으면 화면 가이드 기준)
-AlignResult checkAlign(FacePose? live, FacePose? ref) {
+/// [live]: 지금 카메라 얼굴, [ref]: 먼저 찍은 사진 얼굴 (없으면 화면 가이드 기준).
+/// 둘 다 '화면에 보이는 대로'의 좌표. [selfie]: 셀카(앞 카메라) — 거울 화면이라 좌우로 옮길 방향이 반대
+AlignResult checkAlign(FacePose? live, FacePose? ref, {bool selfie = false}) {
   if (live == null) return const AlignResult.noFace();
   final items = <AlignItem>[];
 
@@ -146,9 +156,12 @@ AlignResult checkAlign(FacePose? live, FacePose? ref) {
   final ok = d.dx.abs() <= tolP && d.dy.abs() <= tolP;
   String hint;
   if (d.dx.abs() >= d.dy.abs()) {
-    hint = d.dx > 0
-        ? '얼굴이 화면 오른쪽에 있어요 · 카메라를 오른쪽으로 조금 옮겨 주세요'
-        : '얼굴이 화면 왼쪽에 있어요 · 카메라를 왼쪽으로 조금 옮겨 주세요';
+    final right = d.dx > 0;
+    // 후면: 카메라를 얼굴 쪽으로 / 셀카(거울 화면): 휴대폰을 반대쪽으로
+    final move = (right != selfie) ? '오른쪽' : '왼쪽';
+    hint =
+        '얼굴이 화면 ${right ? '오른쪽' : '왼쪽'}에 있어요 · '
+        '${selfie ? '휴대폰을' : '카메라를'} $move으로 조금 옮겨 주세요';
   } else {
     hint = d.dy > 0
         ? '얼굴이 화면 아래쪽에 있어요 · 카메라를 조금 내려 주세요'

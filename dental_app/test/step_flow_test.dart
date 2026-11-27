@@ -38,6 +38,29 @@ Future<void> _settle(WidgetTester t, {bool Function()? until}) async {
 }
 
 void main() {
+  testWidgets('🆕 시뮬레이터를 열면 예시 사진 없이 빈 화면 (1단계)', (t) async {
+    debugStepFlowOff = false;
+    debugSamplePhotos = false;
+    addTearDown(() {
+      debugStepFlowOff = true;
+      debugSamplePhotos = true;
+    });
+    t.view.physicalSize = const Size(1440, 900);
+    t.view.devicePixelRatio = 1;
+    addTearDown(t.view.reset);
+    await t.pumpWidget(
+      MaterialApp(
+        theme: buildTheme(),
+        home: const SimulatorHomeScreen(profile: _profile),
+      ),
+    );
+    await _settle(t, until: () => find.text('1. 사진 넣기').evaluate().isNotEmpty);
+    expect(find.textContaining('김민수'), findsNothing);
+    expect(find.textContaining('예시'), findsNothing);
+    expect(find.text('눌러서 사진 넣기 (촬영·갤러리)'), findsNWidgets(2));
+    expect(t.takeException(), isNull);
+  });
+
   test('사진 돌리기: 가로 120×90 → 세로 90×120, 옆으로 누운(EXIF) 사진 바로 세우기', () {
     final r = img.decodeJpg(rotatePhoto(jpg(100), 1))!;
     expect([r.width, r.height], [90, 120]);
