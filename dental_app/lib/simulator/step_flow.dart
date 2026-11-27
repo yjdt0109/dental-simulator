@@ -2,19 +2,12 @@ part of 'simulator_screen.dart';
 
 // -----------------------------------------------------------------------------
 // 🆕 단계형 시뮬레이터 화면 (새 단장)
-//   ① 사진 → ② 치아 고르기 → ③ 치료 정하기 → ④ After 만들기 → ⑤ 다듬기 → ⑥ Final Smile → ⑦ 저장
+//   ① 사진 → ② 치료 정하기 → ③ After 만들기 → ④ 다듬기 → ⑤ Final Smile → ⑥ 저장
+//   (2026.11.27-f: '치아 고르기' 단계 뺌 — 사용자 요청. 🪄 선택은 1단계 사진에서 탭하면 그대로 됨)
 //   기능(변환·🪄·크기 조절·Final Smile·저장·PC 연결)은 기존 것을 그대로 쓰고 화면 흐름만 새로.
 // -----------------------------------------------------------------------------
 
-const kSteps = [
-  '사진',
-  '치아 고르기',
-  '치료 정하기',
-  'After 만들기',
-  '다듬기',
-  'Final Smile',
-  '저장',
-];
+const kSteps = ['사진', '치료 정하기', 'After 만들기', '다듬기', 'Final Smile', '저장'];
 
 extension _StepFlow on _SimulatorHomeScreenState {
   /// 단계마다 할 일을 끝냈는지 (단계 표시줄의 ✓)
@@ -23,12 +16,11 @@ extension _StepFlow on _SimulatorHomeScreenState {
     final c = _c;
     return switch (k) {
       1 => _slotPhoto(p, 2) != null || _slotPhoto(p, 1) != null,
-      2 => p.hasSam,
-      3 => c.tx.isNotEmpty && c.teeth.isNotEmpty,
-      4 => p.results.isNotEmpty,
-      5 => p.results.any((r) => r.engine.contains('크기조절')),
-      6 => p.extras.any((e) => e.label.contains('Final Smile')),
-      7 => c.doneAt != null,
+      2 => c.tx.isNotEmpty && c.teeth.isNotEmpty,
+      3 => p.results.isNotEmpty,
+      4 => p.results.any((r) => r.engine.contains('크기조절')),
+      5 => p.extras.any((e) => e.label.contains('Final Smile')),
+      6 => c.doneAt != null,
       _ => false,
     };
   }
@@ -40,16 +32,16 @@ extension _StepFlow on _SimulatorHomeScreenState {
     _ss(() {
       _step = k.clamp(1, kSteps.length);
       switch (_step) {
-        case 1 || 2 || 3:
+        case 1 || 2:
           if (!p.editing) _toEditView(p);
           _smileView = false;
-        case 4 || 5:
+        case 3 || 4:
           _smileView = false;
           if (p.results.isNotEmpty) {
             p.editing = false;
             p.sel = [0, p.results.length];
           }
-        case 6:
+        case 5:
           if (p.smileAfter != null) {
             p.editing = false;
             _smileView = true;
@@ -238,15 +230,16 @@ extension _StepFlow on _SimulatorHomeScreenState {
             color: AppColors.blueDeep,
           ),
         ),
-        const SizedBox(height: 4),
-        Text(
-          help,
-          style: const TextStyle(
-            fontSize: 12.5,
-            color: AppColors.gray500,
-            height: 1.45,
+        if (help.isNotEmpty) const SizedBox(height: 4),
+        if (help.isNotEmpty)
+          Text(
+            help,
+            style: const TextStyle(
+              fontSize: 12.5,
+              color: AppColors.gray500,
+              height: 1.45,
+            ),
           ),
-        ),
       ],
     ),
   );
@@ -276,69 +269,18 @@ extension _StepFlow on _SimulatorHomeScreenState {
       2 => Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _stepTitle(
-            '치아 고르기',
-            '사진에서 치료할 치아를 하나씩 누르세요 (🪄 자동으로 윤곽을 찾아요). 다시 누르면 빠집니다. '
-                '이웃 치아까지 고르면 치아 사이 틈도 자연스럽게 채워져요.',
-          ),
-          if (!_samOn)
-            _warn(
-              _useAi
-                  ? '🪄 자동 선택에는 Fal.ai 키가 필요해요 ([🔑 API 키 설정]). 고르지 않고 넘어가면 AI 가 치아 전체를 바꿉니다.'
-                  : 'AI 를 켜야 치아를 고를 수 있어요.',
-            )
-          else
-            Text(
-              p.hasSam ? '✓ 고른 치아 ${p.sam.length}개' : '아직 고른 치아가 없어요',
-              style: const TextStyle(fontWeight: FontWeight.w800),
-            ),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              OutlinedButton.icon(
-                onPressed: p.samHistory.isEmpty ? null : () => _samUndo(p),
-                icon: const Icon(Icons.undo_rounded, size: 18),
-                label: const Text('마지막 선택 취소'),
-              ),
-              OutlinedButton.icon(
-                onPressed: p.sam.isEmpty ? null : () => _samClear(p),
-                icon: const Icon(Icons.delete_outline_rounded, size: 18),
-                label: const Text('모두 지우기'),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          ExpansionTile(
-            tilePadding: EdgeInsets.zero,
-            title: const Text(
-              '고급: 서비컬 라인 직접 그리기',
-              style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700),
-            ),
-            children: [if (_useAi) _guideCheck(p)],
-          ),
+          _stepTitle('치료 정하기', '환자 이름 · 치료 종류 · 치료 부위 · 희망 셰이드를 정하세요.'),
+          _panelParts(locked, const {1, 2, 3, 4}), // 상담 메모(6)는 마지막 저장 단계로
         ],
       ),
       3 => Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _stepTitle('치료 정하기', '환자 이름 · 치료 종류 · 치료 부위 · 희망 셰이드를 정하세요.'),
-          _panelParts(locked, const {1, 2, 3, 4, 6}),
-        ],
-      ),
-      4 => Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          _stepTitle(
-            'After 만들기',
-            '[After 변환하기]를 누르면 고른 치아만 새로 만들어요. 결과는 왼쪽 목록에 After 1, 2 … 로 쌓이고, '
-                '결과를 누르면 그 결과를 기준으로 다시 다듬을 수 있어요.',
-          ),
+          _stepTitle('After 만들기', ''), // 설명 글 뺌 (사용자 요청)
           _step4(p, locked),
         ],
       ),
-      5 => Column(
+      4 => Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           _stepTitle(
@@ -378,7 +320,7 @@ extension _StepFlow on _SimulatorHomeScreenState {
             ),
         ],
       ),
-      6 => Column(
+      5 => Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           _stepTitle(
@@ -389,7 +331,7 @@ extension _StepFlow on _SimulatorHomeScreenState {
           const SizedBox(height: 10),
           Text(
             _finalAfter(p) == null
-                ? '⚠ 먼저 4단계에서 After 를 만들어 주세요'
+                ? '⚠ 먼저 3단계에서 After 를 만들어 주세요'
                 : '쓸 After: ${_finalAfterLabel(p)}',
             style: const TextStyle(fontSize: 12.5, color: AppColors.gray500),
           ),
@@ -437,10 +379,135 @@ extension _StepFlow on _SimulatorHomeScreenState {
           ),
           _summary(p),
           const SizedBox(height: 12),
-          _panelParts(locked, const {7}),
+          _panelParts(locked, const {6, 7}), // 상담 메모 + 저장
         ],
       ),
     };
+  }
+
+  /// 🔁 기준 사진 고르기 목록: 원본 2 · 원본 1 · 각 원본의 After 1, 2 …  (k = 원본 번호, n = 0 원본 / N After)
+  List<({int k, int n, String label})> _baseChoices(PatientPhoto p) {
+    final out = <({int k, int n, String label})>[];
+    for (final k in const [2, 1]) {
+      final q = _slotPhoto(p, k);
+      if (q == null) {
+        // 원본 1 은 미소 사진만 넣어 둔 경우도 고를 수 있게 (고르면 원본 1 자리를 만듦)
+        if (k == 1 && _slot1Bytes(p) != null) {
+          out.add((k: 1, n: 0, label: '원본 1 (미소)'));
+        }
+        continue;
+      }
+      out.add((k: k, n: 0, label: _label(q, 0)));
+      for (var n = 1; n <= q.results.length; n++) {
+        out.add((
+          k: k,
+          n: n,
+          label: '${_label(q, n)}${k == 1 ? ' · 원본 1' : ''}',
+        ));
+      }
+    }
+    if (out.isEmpty) out.add((k: p.slot, n: 0, label: _label(p, 0)));
+    return out;
+  }
+
+  /// 지금 기준 사진 (원본 번호, 0 원본 / N After)
+  ({int k, int n}) _baseNow(PatientPhoto p) => (k: p.slot, n: p.baseIndex);
+
+  /// 기준 사진 정하기: 다른 원본이면 그 사진으로 옮기고, 그 사진의 기준을 원본/After N 으로
+  Future<void> _pickBase(int k, int n) async {
+    final p = _cur;
+    if (p == null || _converting) return;
+    var q = _slotPhoto(p, k);
+    if (q == null && k == 1) {
+      await _slotSelect(p, 1);
+      q = _cur != null && _cur!.slot == 1 ? _cur : null;
+    }
+    if (q == null || !mounted) return;
+    if (!identical(q, _cur)) _select(q);
+    final t = q;
+    _ss(() {
+      t.basePick = n.clamp(0, t.results.length);
+      _smileView = false;
+      if (t.results.isEmpty || n == 0) {
+        if (t.results.isEmpty) {
+          t.editing = true;
+        } else {
+          t.editing = false;
+          t.sel = [0];
+        }
+      } else {
+        t.editing = false;
+        t.sel = [0, n];
+      }
+    });
+  }
+
+  /// [기준 사진 고르기] 버튼 + 지금 기준
+  Widget _basePicker(PatientPhoto p, bool locked) {
+    final now = _baseNow(p);
+    final cur = _baseChoices(p).where((c) => c.k == now.k && c.n == now.n);
+    final label = cur.isEmpty ? _label(p, p.baseIndex) : cur.first.label;
+    return OutlinedButton.icon(
+      style: OutlinedButton.styleFrom(
+        minimumSize: const Size(0, 48),
+        alignment: Alignment.centerLeft,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      ),
+      onPressed: locked || _converting ? null : () => _openBasePicker(p),
+      icon: const Icon(Icons.photo_library_outlined),
+      label: Text.rich(
+        TextSpan(
+          children: [
+            const TextSpan(
+              text: '기준 사진 고르기\n',
+              style: TextStyle(fontSize: 12, color: AppColors.gray500),
+            ),
+            TextSpan(
+              text: '$label  ▾',
+              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openBasePicker(PatientPhoto p) async {
+    final now = _baseNow(p);
+    final list = _baseChoices(p);
+    final pick = await showModalBottomSheet<({int k, int n, String label})>(
+      context: context,
+      showDragHandle: true,
+      backgroundColor: Colors.white,
+      constraints: const BoxConstraints(maxWidth: 480),
+      builder: (ctx) => SafeArea(
+        child: ListView(
+          shrinkWrap: true,
+          children: [
+            const Padding(
+              padding: EdgeInsets.fromLTRB(20, 0, 20, 8),
+              child: Text(
+                '기준 사진 고르기 · 이 사진을 바탕으로 변환해요',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+              ),
+            ),
+            for (final c in list)
+              ListTile(
+                leading: Icon(
+                  c.k == now.k && c.n == now.n
+                      ? Icons.radio_button_checked
+                      : Icons.radio_button_unchecked,
+                  color: AppColors.blue,
+                ),
+                title: Text(c.label),
+                onTap: () => Navigator.pop(ctx, c),
+              ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+    if (pick != null) await _pickBase(pick.k, pick.n);
   }
 
   String _finalAfterLabel(PatientPhoto p) {
@@ -633,18 +700,12 @@ extension _StepFlow on _SimulatorHomeScreenState {
   Widget _step4(PatientPhoto p, bool locked) {
     final c = _c;
     final converted = _converted, stale = _stale;
-    final eff = _useAi ? _engineNow() : null;
+    // 엔진 설명 글은 뺌 (사용자 요청 2026.11.27-f, 엔진은 ⚙ 고급에서)
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(
-          eff == null
-              ? '엔진: AI 꺼짐 (기본 미백 방식)'
-              : '엔진: ${eff.engine.tag} · ${eff.engine.label}${eff.note == null ? '' : '\n${eff.note}'}',
-          style: const TextStyle(fontSize: 12.5, color: AppColors.gray500),
-        ),
-        const SizedBox(height: 6),
-        _baseLine(p),
+        _basePicker(p, locked),
+        const SizedBox(height: 10),
         if (_useAi) ...[
           const Text(
             '추가 요청 (선택)',
@@ -820,7 +881,7 @@ extension _StepFlow on _SimulatorHomeScreenState {
               icon: const Icon(Icons.sentiment_very_satisfied_outlined),
               label: const Text('😊 미소 미리보기 (미소에 입히기 · 정밀 매칭)'),
             ),
-            help: '보통은 6단계 Final Smile 을 쓰세요.',
+            help: '보통은 5단계 Final Smile 을 쓰세요.',
           ),
           sec(
             'API 키',

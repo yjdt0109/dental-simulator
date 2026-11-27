@@ -316,8 +316,23 @@ function renderPanel(teeth, tx, view) {
   const cb = $('#convertBtn');
   cb.disabled = lk || busy;
   cb.classList.toggle('busy', busy);
-  $('#convertBase').textContent = state.base ? `🔁 기준 사진: ${state.base} → 이 결과를 다듬어요 (원본으로 하려면 비교 목록에서 원본 클릭)` : '기준 사진: 원본 · 브리핑 비교 목록에서 변환 결과를 클릭하면 그 결과를 기준으로 다시 변환해요';
-  $('#convertBase').classList.toggle('on', !!state.base);
+  // 🔁 기준 사진 고르기 (태블릿 2026.11.27-f 이상: state.bases) — 예전 태블릿이면 예전 안내 글
+  const bases = Array.isArray(state.bases) ? state.bases : null;
+  $('#basePickBox').hidden = !bases;
+  $('#convertBase').hidden = !!bases;
+  if (bases) {
+    const sel = $('#baseSel');
+    const key = JSON.stringify(bases);
+    if (sel.dataset.key !== key) {
+      sel.dataset.key = key;
+      sel.innerHTML = bases.map((b) => `<option value="${b.k}:${b.n}">${esc(b.l)}</option>`).join('');
+    }
+    if (document.activeElement !== sel) sel.value = state.baseNow || '';
+    sel.disabled = lk || busy;
+  } else {
+    $('#convertBase').textContent = state.base ? `🔁 기준 사진: ${state.base} → 이 결과를 다듬어요 (원본으로 하려면 비교 목록에서 원본 클릭)` : '기준 사진: 원본 · 브리핑 비교 목록에서 변환 결과를 클릭하면 그 결과를 기준으로 다시 변환해요';
+    $('#convertBase').classList.toggle('on', !!state.base);
+  }
   // 지금 엔진 한 줄 (바꾸기는 ⚙ 고급)
   const ENG = { a: '옵션 A · FLUX + 나노바나나 2.1', b: '옵션 B · FLUX + 나노바나나 Pro', c: '옵션 C · FLUX + Vertex AI', solo: '교정·단독 · 나노바나나 단독' };
   $('#engineNow').textContent = !state.useAi ? '엔진: AI 꺼짐 (기본 미백 방식) · 켜기는 ⚙ 고급' : `엔진: ${ENG[state.engineEff || state.engine] || '-'}${state.engineNote ? ' · ' + state.engineNote : ''} · 바꾸기는 ⚙ 고급`;
@@ -1639,6 +1654,11 @@ function renderStepBar() {
   el.innerHTML = STEPS.map((s, i) => `<button type="button" data-step="${i + 1}" class="${ui.step === i + 1 ? 'on' : ''}">${i + 1} ${s}</button>`).join('<i>›</i>');
 }
 $('#stepBar').addEventListener('click', (e) => { const b = e.target.closest('[data-step]'); if (b) cmd('step', Number(b.dataset.step)); });
+$('#baseSel').addEventListener('change', (e) => {
+  const [k, n] = e.target.value.split(':').map(Number);
+  cmd('basePick', { k, n });
+  e.target.blur();
+});
 $('#newCaseBtn').addEventListener('click', () => {
   if (state && state.hasAfter && !locked() && !confirm('지금 작업을 아직 저장하지 않았어요 (저장하지 않으면 환자 기록에 남지 않아요).\n새 작업을 시작할까요?')) return;
   cmd('newCase');

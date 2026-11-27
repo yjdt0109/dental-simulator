@@ -402,6 +402,11 @@ table.rank td { padding: 8px; border-top: 1px solid var(--line); }
 .sam-row button:disabled { opacity: .4; cursor: not-allowed; }
 .toast { position: fixed; left: 50%; bottom: 28px; transform: translateX(-50%); z-index: 50; max-width: min(640px, 92vw); background: #1d2939; color: #fff; padding: 12px 18px; border-radius: 12px; font-weight: 600; box-shadow: 0 8px 24px rgba(0,0,0,.3); }
 .convert-base { display: block; margin-bottom: 6px; }
+.base-pick { display: grid; gap: 6px; margin-bottom: 10px; font-weight: 800; color: var(--blue-deep); }
+.base-pick small { font-weight: 400; color: var(--muted); font-size: 12px; margin-left: 4px; }
+.base-pick select { font: inherit; font-size: 15px; font-weight: 700; padding: 10px 12px; border: 1.5px solid var(--blue); border-radius: 10px; background: #fff; color: var(--ink, #111); }
+.memo-box.in-panel { margin: 12px 0 10px; padding: 10px 12px 12px; }
+.memo-box.in-panel textarea { height: 84px; font-size: 14px; }
 .convert-base.on { color: var(--blue-deep); font-weight: 800; }
 .smref { border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; margin-bottom: 8px; display: grid; gap: 6px; background: #fff; }
 .smref label { display: flex; gap: 8px; align-items: center; font-size: 13px; font-weight: 700; cursor: pointer; }

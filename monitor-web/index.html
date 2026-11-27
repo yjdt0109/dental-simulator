@@ -9,14 +9,14 @@
 <link rel="icon" href="icons/icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@500;600;700&family=Noto+Sans+KR:wght@400;500;700;800&display=swap">
-<link rel="stylesheet" href="style.css?v=3.44">
+<link rel="stylesheet" href="style.css?v=3.45">
 </head>
 <body>
 <header class="bar">
   <div class="logo" aria-hidden="true">
     <svg width="22" height="22" viewBox="0 0 100 100"><path d="M32 24C18 24 17 42 22 52C27 62 28 80 36 80C43 80 42 62 50 62C58 62 57 80 64 80C72 80 73 62 78 52C83 42 82 24 68 24C60 24 56 29 50 29C44 29 40 24 32 24Z" fill="none" stroke="#fff" stroke-width="6" stroke-linejoin="round"/><line x1="50" y1="14" x2="50" y2="88" stroke="#fff" stroke-width="5" stroke-linecap="round"/></svg>
   </div>
-  <div class="brand"><b>상담 모니터 <span class="ver">v3.44</span></b><small id="sub">B&amp;A 치과 시뮬레이터</small></div>
+  <div class="brand"><b>상담 모니터 <span class="ver">v3.45</span></b><small id="sub">B&amp;A 치과 시뮬레이터</small></div>
   <select id="roomName" aria-label="상담실 이름">
     <option>상담실 1</option><option>상담실 2</option><option>상담실 3</option><option>상담실 4</option><option>원장실</option><option>대기실 TV</option>
   </select>
@@ -221,10 +221,6 @@
           <button type="button" id="vSlider">겹쳐 보기 (손잡이)</button>
         </div>
       </div>
-      <div class="memo-box">
-        <label for="memo">📝 상담 메모 <small>태블릿 상담 메모와 실시간으로 함께 바뀝니다</small><span class="memo-st" id="memoSt"></span></label>
-        <textarea id="memo" placeholder="예) 치료 기간 약 3주, 비용 안내 완료"></textarea>
-      </div>
       <p class="hint" id="hint"></p>
     </div>
 
@@ -276,7 +272,7 @@
       </div>
 
       <div class="p-sec ai-box">
-        <small class="p-note" id="engineNow"></small>
+        <small class="p-note" id="engineNow" hidden></small>
         <div id="aiReqBox">
           <div class="p-row between"><h3>추가 요청 <small>(선택 · 직접 입력 · 한글 OK)</small></h3><button type="button" class="btn sm" id="aiDefault" hidden>지우기</button></div>
           <textarea id="aiReq" rows="3" placeholder="예: 11·21 절단끝 0.5mm 길게, 좌우 대칭, 22번 깨진 끝 복원"></textarea>
@@ -307,8 +303,14 @@
           </div>
         </details>
       </div>
+      <label class="base-pick" id="basePickBox" hidden><span>🔁 기준 사진 고르기 <small>이 사진을 바탕으로 변환해요</small></span>
+        <select id="baseSel"></select></label>
       <small class="p-note convert-base" id="convertBase"></small>
       <button type="button" class="convert" id="convertBtn">✨ After 변환하기</button>
+      <div class="memo-box in-panel"><!-- v3.45: 상담 메모를 저장 버튼 바로 위(마지막)로 -->
+        <label for="memo">📝 상담 메모 <small>태블릿 상담 메모와 실시간으로 함께 바뀝니다</small><span class="memo-st" id="memoSt"></span></label>
+        <textarea id="memo" placeholder="예) 치료 기간 약 3주, 비용 안내 완료"></textarea>
+      </div>
       <button type="button" class="btn save-btn" id="saveBtn">💾 저장 및 상담 완료</button>
       <small class="p-note center" id="saveNote"></small>
       <small class="p-note center" id="convertNote"></small>
@@ -442,7 +444,7 @@
 </div>
 
 <script src="qrcode.min.js"></script>
-<script type="module" src="app.js?v=3.44"></script>
+<script type="module" src="app.js?v=3.45"></script>
 <div class="toast" id="toast" hidden></div>
 <div class="overlay" id="camOv" hidden role="dialog" aria-modal="true" aria-labelledby="camTitle">
   <div class="ov-card">

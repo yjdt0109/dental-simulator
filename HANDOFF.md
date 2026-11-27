@@ -4,8 +4,8 @@
 > "HANDOFF.md 읽고 이어서 작업해줘"라고 하면 됩니다. 답변은 항상 한글로.
 
 ## 1. 현재 버전
-- 태블릿 앱(안드로이드 APK, Flutter): **2026.11.27-e** (고정 열쇠 서명, analyze·test 155개·APK 빌드 확인) (`lib/cast/cast_service.dart`의 `appVersion`)
-- 상담 PC 모니터(웹, Netlify에 폴더째 끌어다 놓기): **v3.44** (`monitor-web/`)
+- 태블릿 앱(안드로이드 APK, Flutter): **2026.11.27-f** (고정 열쇠 서명, analyze·test 155개·APK 빌드 확인) (`lib/cast/cast_service.dart`의 `appVersion`)
+- 상담 PC 모니터(웹, Netlify에 폴더째 끌어다 놓기): **v3.45** (`monitor-web/`)
 - 자동 테스트: 155개 모두 통과 (`flutter test`)
 
 ## 2. 구성
@@ -48,7 +48,8 @@
 30. **2026.11.27-c (PC 변경 없음, v3.43 그대로)**: ① PC [＋ 새 작업]이 상담 완료(잠김) 환자에서 무시되던 것 수정 — `_onRemoteCmd` 에서 `newCase` 를 잠금 검사 앞으로 ② 🦷 치아 **줄이기** 때 옆 치아에 구멍(입 안 어두운 색)이 나던 것 수정 — `scaleToothMasked` 가 원래 자리를 덮을 때 윤곽을 사방으로 8% 넓히던 것을 **줄이는 방향으로만** 넓힘(`_dilateDir`, 다른 방향은 2%+1.5px, 흐림이 새어 나간 옅은 부분은 버림), 테스트 '바로 옆 치아는 구멍 나지 않고 그대로' ③ PC 로 보내는 사진을 긴 변 1280·품질 80 → **2048·품질 88** (`jpegBase64` 기본값, 미소 창 사진도) → PC 에서 크게 확대해도 덜 흐림. AI 결과 자체의 화질(나노바나나 리터칭이 부드럽게 만드는 정도)은 실제 사진으로 확인 필요
 31. **2026.11.27-d / PC v3.44**: 비교 목록의 미소 사진(원본 2 쪽 `p.smile` = 원본 1) 이름 '😊 미소 1' → **'원본 1 (미소)'** (`noteSmile`, 한 장만, 나머지는 '😊 미소 N'). PC 비교 목록 사진 왼쪽 위 **①② 버튼(`slotFromList`) 없앰** (사용자 요청 — 원본 카드 📷·📁·🗂 로 대신. 태블릿 쪽 `slotFromList` 명령 처리는 남아 있음)
 32. **2026.11.27-e (PC 변경 없음)**: **폰(가로 700 미만)**에서 새 화면 위 단계 표시줄(1 사진 › 2 › … 7) 숨김(`_stepBar`, 이동은 [이전]/[다음]) + 메인 사진 아래 🪄 도구 줄(🪄·붓·지우개·기준점·되돌리기·지우기) 숨김(`RoiEditor.showSamBar`, 미소 미리보기 화면의 붓 도구는 그대로). 태블릿·PC 는 그대로
-33. **상담 PC**: 위 기능 대부분을 마우스로 (SAM, 기준점, 크기 조절, QA, 보관함, 기록, 미소)
+33. **2026.11.27-f / PC v3.45 (사용자 요청)**: 새 화면 단계 7개 → **6개** (① 사진 ② 치료 정하기 ③ After 만들기 ④ 다듬기 ⑤ Final Smile ⑥ 저장) — '치아 고르기' 단계 뺌(🪄 선택은 1단계 사진 탭으로 그대로). PC `step` 명령도 1~6. **상담 메모**는 2단계에서 빼서 마지막 저장 단계(`_panelParts {6, 7}`)로. ③ After 단계의 설명 글·엔진 줄 뺌 → **[기준 사진 고르기]** 버튼(`_basePicker`·`_openBasePicker`·`_baseChoices`·`_pickBase`: 원본 2·원본 2 의 After N·원본 1·원본 1 의 After N 중 고르면 그 원본으로 옮기고 `basePick` 지정 → 그 사진을 바탕으로 변환). PC: state `bases [{k,n,l}]`·`baseNow "k:n"`, 명령 `basePick {k,n}`, 오른쪽 패널 [🔁 기준 사진 고르기] 선택 칸(예전 태블릿이면 예전 안내 글), 엔진 줄(`#engineNow`) 숨김, **상담 메모를 오른쪽 패널 [저장 및 상담 완료] 바로 위로** 옮김(`.memo-box.in-panel`). PC 화면은 가짜 Firebase(Playwright, gstatic 주소를 가짜 모듈로 바꿔 끼움)로 확인
+34. **상담 PC**: 위 기능 대부분을 마우스로 (SAM, 기준점, 크기 조절, QA, 보관함, 기록, 미소)
 
 ## 4. 마지막 대화에서 논의 중이던 것 (다음 할 일)
 - ③·② 넣음(2026.11.25-f) → 사용자 실제 테스트 결과 대기. 남은 제안: ④ 일반 라미네이트·크라운에도 원하는 절단선 지정, 경계 자동 검사(차이 크면 재시도)
@@ -70,7 +71,7 @@ flutter pub get
 flutter test
 flutter build apk --release   # build/app/outputs/flutter-apk/app-release.apk
 ```
-- PC 모니터: `monitor-web` 폴더를 Netlify에 그대로 올림 (사용자에게는 `monitor-web-v3.xx.zip` 으로 묶어 전달). 새 버전 만들 때 index.html의 버전(지금 3.44)을 올림
+- PC 모니터: `monitor-web` 폴더를 Netlify에 그대로 올림 (사용자에게는 `monitor-web-v3.xx.zip` 으로 묶어 전달). 새 버전 만들 때 index.html의 버전(지금 3.45)을 올림
 - 버전 올리기: `lib/cast/cast_service.dart`의 `appVersion` + PC `app.js` 안의 "2026.11.26-c 이상" 문구
 
 ## 6. 주요 파일

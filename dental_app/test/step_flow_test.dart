@@ -71,15 +71,7 @@ void main() {
     );
     await _settle(t, until: () => find.byType(RoiEditor).evaluate().isNotEmpty);
     // 단계 표시줄 + 1단계
-    for (final s in [
-      '사진',
-      '치아 고르기',
-      '치료 정하기',
-      'After 만들기',
-      '다듬기',
-      'Final Smile',
-      '저장',
-    ]) {
+    for (final s in ['사진', '치료 정하기', 'After 만들기', '다듬기', 'Final Smile', '저장']) {
       expect(find.textContaining(s), findsWidgets, reason: s);
     }
     expect(find.text('1. 사진 넣기'), findsOneWidget);
@@ -101,14 +93,13 @@ void main() {
       await Future<void>.delayed(const Duration(milliseconds: 900));
     });
     await _settle(t);
-    // 다음 → 2 → 3단계
-    await t.tap(find.text('다음: 치아 고르기'));
-    await _settle(t);
-    expect(find.text('2. 치아 고르기'), findsOneWidget);
+    // 다음 → 2단계 (치아 고르기 단계는 없음)
+    expect(find.text('다음: 치아 고르기'), findsNothing);
     await t.tap(find.text('다음: 치료 정하기'));
     await _settle(t);
-    expect(find.text('3. 치료 정하기'), findsOneWidget);
+    expect(find.text('2. 치료 정하기'), findsOneWidget);
     expect(find.text('치료 항목'), findsOneWidget);
+    expect(find.text('상담 메모'), findsNothing); // 메모는 마지막 저장 단계에
     send({'t': 'clearTeeth'});
     send({
       't': 'group',
@@ -120,15 +111,17 @@ void main() {
     await t.pump();
     await t.tap(find.text('다음: After 만들기'));
     await _settle(t);
-    expect(find.text('4. After 만들기'), findsOneWidget);
-    expect(find.text('✨ After 만들기'), findsOneWidget); // 간단한 4단계
+    expect(find.text('3. After 만들기'), findsOneWidget);
+    expect(find.text('✨ After 만들기'), findsOneWidget); // 간단한 3단계
+    expect(find.textContaining('엔진:'), findsNothing); // 엔진 설명 글 없음
+    expect(find.textContaining('기준 사진 고르기'), findsOneWidget);
     expect(find.text('AI 시뮬레이션 엔진'), findsNothing); // 엔진 목록은 ⚙ 고급에
     // ⚙ 고급 열고 닫기
     await t.tap(find.text('⚙ 고급'));
     await _settle(t);
     expect(find.text('⚙ 고급 설정'), findsOneWidget);
     expect(find.text('🔑 API 키 · 모델 설정'), findsOneWidget);
-    await t.tap(find.text('닫고 4단계로'));
+    await t.tap(find.text('닫고 3단계로'));
     await _settle(t);
     expect(find.text('⚙ 고급 설정'), findsNothing);
     // 위쪽: 자동 QA·보관함 버튼은 없고 🧪 전문가 메뉴 안에
@@ -145,11 +138,25 @@ void main() {
       until: () => find.textContaining('정하늘 After 1').evaluate().isNotEmpty,
     );
     expect(find.textContaining('정하늘 After 1'), findsWidgets);
-    expect(find.textContaining('비교할 사진'), findsOneWidget); // 4단계부터 목록
-    // 저장 단계로 바로
-    send({'t': 'step', 'v': 7});
+    expect(find.textContaining('비교할 사진'), findsOneWidget); // 3단계부터 목록
+    // 🔁 기준 사진: 고를 수 있는 사진(원본 2·원본 1·After 1) → PC 에서 After 1 고르기
+    await t.tap(find.textContaining('기준 사진 고르기'));
     await _settle(t);
-    expect(find.text('7. 저장'), findsOneWidget);
+    expect(find.text('원본 2 (개구기)'), findsWidgets);
+    expect(find.text('원본 1 (미소)'), findsWidgets);
+    await t.tapAt(const Offset(5, 5)); // 닫기
+    await _settle(t);
+    send({
+      't': 'basePick',
+      'v': {'k': 2, 'n': 1},
+    });
+    await _settle(t);
+    expect(find.textContaining('정하늘 After 1  ▾'), findsOneWidget);
+    // 저장 단계로 바로
+    send({'t': 'step', 'v': 6});
+    await _settle(t);
+    expect(find.text('6. 저장'), findsOneWidget);
+    expect(find.text('상담 메모'), findsOneWidget);
     expect(find.text('정하늘 님'), findsWidgets);
     expect(find.text('＋ 새 작업'), findsWidgets);
     // 💾 저장·상담 완료(잠김) 뒤에도 PC ＋ 새 작업 → 빈 1단계
@@ -180,12 +187,10 @@ void main() {
     // 폰: 위 단계 표시줄(1 사진 › 2 › …)·사진 아래 🪄 도구 줄 없음
     expect(find.text('1 사진'), findsNothing);
     expect(
-      find.byTooltip(
-        '🪄 탭 한 번 자동 선택 (SAM) — 치아를 탭하면 윤곽을 자동으로 찾아요 (다시 탭하면 빠짐)',
-      ),
+      find.byTooltip('🪄 탭 한 번 자동 선택 (SAM) — 치아를 탭하면 윤곽을 자동으로 찾아요 (다시 탭하면 빠짐)'),
       findsNothing,
     );
-    for (var k = 2; k <= 7; k++) {
+    for (var k = 2; k <= 6; k++) {
       CastService.instance.onRemoteCmd!({'t': 'step', 'v': k});
       await _settle(t);
       expect(find.textContaining('$k. '), findsWidgets, reason: '$k');

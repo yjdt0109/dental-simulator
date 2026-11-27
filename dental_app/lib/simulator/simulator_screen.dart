@@ -251,6 +251,11 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
       'redo': p.future.isEmpty ? null : p.future.last.label,
       'notice': _noticeAt == 0 ? null : {'m': _notice, 'at': _noticeAt},
       'base': p.baseIndex == 0 ? '' : _label(p, p.baseIndex),
+      // 🔁 기준 사진 고르기 (PC v3.45): 고를 수 있는 사진 [{k 원본 번호, n 0원본/N After, l 이름}] + 지금 것
+      'bases': [
+        for (final b in _baseChoices(p)) {'k': b.k, 'n': b.n, 'l': b.label},
+      ],
+      'baseNow': '${p.slot}:${p.baseIndex}',
       'rzOk': _mode != _ViewMode.edit && _rzTargetOf(p) != null,
       'rzOf': (() {
         final n = _rzTargetOf(p);
@@ -1053,7 +1058,8 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
     bool same(Uint8List? a) =>
         a != null &&
         (identical(a, b) || (a.length == b.length && listEquals(a, b)));
-    return same(_slotPhoto(p, 1)?.beforeBytes) || (p.slot != 1 && same(p.smile));
+    return same(_slotPhoto(p, 1)?.beforeBytes) ||
+        (p.slot != 1 && same(p.smile));
   }
 
   /// 원본 1 슬롯 비우기 (원본 2 쪽의 미소 사진 연결도 끊음)
@@ -1403,7 +1409,11 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
           );
         }
       case 'step': // PC 단계 이동
-        if (v is int && v >= 1 && v <= 7) _goStep(v);
+        if (v is int && v >= 1 && v <= kSteps.length) _goStep(v);
+      case 'basePick': // PC 기준 사진 고르기 {k, n}
+        if (v is Map && v['k'] is int && v['n'] is int) {
+          _pickBase(v['k'] as int, v['n'] as int);
+        }
       case 'slotSelect': // PC 변환할 원본 고르기 (1 미소 / 2 개구기)
         if (v == 1 || v == 2) _slotSelect(p, v as int);
       case 'slotPhoto': // PC 원본 슬롯에 사진 올리기 {s, b}
@@ -2442,7 +2452,7 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
     // 브리핑 모드: 왼쪽에 원본 + 변환 결과 목록 (체크해서 비교할 사진 고르기)
     // 왼쪽 '비교할 사진' 목록: 브리핑이 아닐 때도 (불러온 사진 확인·고르기) — 폰처럼 좁으면 브리핑에서만
     final listOn = _newUi
-        ? (_briefing || (_step >= 4 && MediaQuery.sizeOf(context).width >= 700))
+        ? (_briefing || (_step >= 3 && MediaQuery.sizeOf(context).width >= 700))
         : (_briefing || MediaQuery.sizeOf(context).width >= 700);
     if (listOn) {
       stage = Row(
@@ -2704,8 +2714,7 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
       'id': p.id,
       'photo': await jpegBase64(sm),
       if (p.smileSet?.overlay != null) 'ov': base64Encode(p.smileSet!.overlay!),
-      if (p.smileAfter != null)
-        'after': await jpegBase64(p.smileAfter!),
+      if (p.smileAfter != null) 'after': await jpegBase64(p.smileAfter!),
       if (_mFor == p.id && _mProsth != null)
         'p2': await jpegBase64(_mProsth!, maxSide: 480, quality: 75),
       // 오늘 만든 After 작은 사진 (PC 정밀 매칭에서 고르기)
