@@ -2356,6 +2356,8 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
         imageSize: p.imageSize,
         roi: p.roi,
         onChanged: (r) => setState(() => p.roi = r),
+        // 폰(가로 700 미만) 메인 화면에서는 🪄 도구 줄 숨김 (사용자 요청 2026.11.27-e)
+        showSamBar: MediaQuery.sizeOf(context).width >= 700,
         showRoi: !_useAi, // AI 사용 시: 영역 표시 없이 사진만 (순수 프롬프트)
         lines: p.lines,
         onLineAdd: _drawLines && _useAi && _c.doneAt == null

@@ -177,6 +177,14 @@ void main() {
     );
     await _settle(t, until: () => find.byType(RoiEditor).evaluate().isNotEmpty);
     expect(find.text('1. 사진 넣기'), findsOneWidget);
+    // 폰: 위 단계 표시줄(1 사진 › 2 › …)·사진 아래 🪄 도구 줄 없음
+    expect(find.text('1 사진'), findsNothing);
+    expect(
+      find.byTooltip(
+        '🪄 탭 한 번 자동 선택 (SAM) — 치아를 탭하면 윤곽을 자동으로 찾아요 (다시 탭하면 빠짐)',
+      ),
+      findsNothing,
+    );
     for (var k = 2; k <= 7; k++) {
       CastService.instance.onRemoteCmd!({'t': 'step', 'v': k});
       await _settle(t);

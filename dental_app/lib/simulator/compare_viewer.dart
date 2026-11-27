@@ -92,6 +92,7 @@ class RoiEditor extends StatefulWidget {
     this.samOverlay,
     this.onSamTap,
     this.samBusy = false,
+    this.showSamBar = true,
     this.samCount = 0,
     this.onSamUndo,
     this.onSamClear,
@@ -104,6 +105,9 @@ class RoiEditor extends StatefulWidget {
   final Uint8List? samOverlay;
   final ValueChanged<Offset>? onSamTap; // null 이면 SAM 도구 숨김
   final bool samBusy;
+
+  /// 사진 아래 🪄 도구 줄 (🪄·붓·지우개·기준점·되돌리기·지우기) 보이기
+  final bool showSamBar;
   final int samCount;
   final VoidCallback? onSamUndo;
   final VoidCallback? onSamClear;
@@ -729,7 +733,7 @@ class _RoiEditorState extends State<RoiEditor> {
                       ),
                     ),
                   if (_drawOn) Positioned(left: 12, top: 84, child: _toolBar()),
-                  if (_samOn)
+                  if (_samOn && widget.showSamBar)
                     Positioned(
                       left: 12,
                       right: 12,

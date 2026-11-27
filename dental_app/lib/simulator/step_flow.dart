@@ -62,6 +62,8 @@ extension _StepFlow on _SimulatorHomeScreenState {
 
   Widget _stepBar() {
     final phone = MediaQuery.sizeOf(context).width < 700;
+    // 폰에서는 단계 표시줄 숨김 (사용자 요청 2026.11.27-e) — [이전]/[다음] 으로 이동
+    if (phone) return const SizedBox.shrink();
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       child: Row(
@@ -166,7 +168,7 @@ extension _StepFlow on _SimulatorHomeScreenState {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           _stepBar(),
-          const SizedBox(height: 12),
+          if (!phone) const SizedBox(height: 12),
           _viewerCard(fill: false, stageHeight: stageH),
           const SizedBox(height: 14),
           _card(
