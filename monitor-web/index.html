@@ -9,14 +9,14 @@
 <link rel="icon" href="icons/icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@500;600;700&family=Noto+Sans+KR:wght@400;500;700;800&display=swap">
-<link rel="stylesheet" href="style.css?v=3.45">
+<link rel="stylesheet" href="style.css?v=3.46">
 </head>
 <body>
 <header class="bar">
   <div class="logo" aria-hidden="true">
     <svg width="22" height="22" viewBox="0 0 100 100"><path d="M32 24C18 24 17 42 22 52C27 62 28 80 36 80C43 80 42 62 50 62C58 62 57 80 64 80C72 80 73 62 78 52C83 42 82 24 68 24C60 24 56 29 50 29C44 29 40 24 32 24Z" fill="none" stroke="#fff" stroke-width="6" stroke-linejoin="round"/><line x1="50" y1="14" x2="50" y2="88" stroke="#fff" stroke-width="5" stroke-linecap="round"/></svg>
   </div>
-  <div class="brand"><b>상담 모니터 <span class="ver">v3.45</span></b><small id="sub">B&amp;A 치과 시뮬레이터</small></div>
+  <div class="brand"><b>상담 모니터 <span class="ver">v3.46</span></b><small id="sub">B&amp;A 치과 시뮬레이터</small></div>
   <select id="roomName" aria-label="상담실 이름">
     <option>상담실 1</option><option>상담실 2</option><option>상담실 3</option><option>상담실 4</option><option>원장실</option><option>대기실 TV</option>
   </select>
@@ -444,7 +444,7 @@
 </div>
 
 <script src="qrcode.min.js"></script>
-<script type="module" src="app.js?v=3.45"></script>
+<script type="module" src="app.js?v=3.46"></script>
 <div class="toast" id="toast" hidden></div>
 <div class="overlay" id="camOv" hidden role="dialog" aria-modal="true" aria-labelledby="camTitle">
   <div class="ov-card">
@@ -454,7 +454,20 @@
       <button class="btn icon" type="button" data-close="camOv" aria-label="닫기">✕</button>
     </div>
     <div class="ov-body cam-body">
-      <div class="cam-view"><video id="camVideo" autoplay playsinline muted></video><img id="camShot" alt="찍은 사진" hidden></div>
+      <div class="cam-view"><div class="cam-stage" id="camStage">
+        <video id="camVideo" autoplay playsinline muted></video>
+        <img id="camGhost" class="cam-ghost" alt="" hidden>
+        <img id="camOutline" class="cam-ghost" alt="" hidden>
+        <svg id="camGuide" class="cam-guide" preserveAspectRatio="none" aria-hidden="true"></svg>
+        <div class="cam-check" id="camCheck" hidden><div class="cam-chips" id="camChips"></div><div class="cam-hint" id="camHint"></div></div>
+        <img id="camShot" alt="찍은 사진" hidden>
+      </div></div>
+      <div class="cam-tools" id="camTools">
+        <label>겹쳐 볼 사진 <select id="camGhostSel"><option value="0">없음</option><option value="1">원본 1 (미소)</option><option value="2">원본 2 (개구기)</option></select></label>
+        <span class="seg" id="camGhostMode"><button type="button" data-gm="photo" aria-pressed="true">반투명 사진</button><button type="button" data-gm="outline" aria-pressed="false">윤곽선</button></span>
+        <label id="camOpRow">투명도 <input type="range" id="camOp" min="15" max="70" step="5" value="35"> <b id="camOpVal">35%</b></label>
+        <label><input type="checkbox" id="camGuideOn" checked> 가이드선</label>
+      </div>
       <select id="camSel" aria-label="카메라 고르기" hidden></select>
       <div class="cam-acts">
         <button type="button" class="btn primary" id="camSnap">📸 찍기</button>

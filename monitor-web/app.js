@@ -881,6 +881,7 @@ async function start() {
   onValue(ref(db, base + '/archive'), (s) => { archive = s.val(); renderArchive(); });
   onValue(ref(db, base + '/archiveFull'), (s) => { const v = s.val(); if (v) gotBackup(v); });
   onValue(ref(db, base + '/slotImg'), (s) => { slotImg = s.val() || {}; renderSlots(); });
+  onValue(ref(db, base + '/slotGhost'), (s) => { slotGhost = s.val() || {}; if (!$('#camOv').hidden) camGhostApply(); });
   onValue(ref(db, base + '/smileImg'), (s) => {
     smileData = s.val();
     showSmileImg();
@@ -1310,20 +1311,22 @@ applyExpert();
 
 // 📷 사진 촬영 (PC 카메라) → 원본 1·2 로
 let camStream = null, camShotData = null;
-function camStop() { if (camStream) { camStream.getTracks().forEach((t) => t.stop()); camStream = null; } }
+function camStop() { camFaceStop(); if (camStream) { camStream.getTracks().forEach((t) => t.stop()); camStream = null; } }
 async function camStart(deviceId) {
   camStop();
   $('#camMsg').textContent = '카메라를 켜는 중…';
   try {
     camStream = await navigator.mediaDevices.getUserMedia({ video: deviceId ? { deviceId: { exact: deviceId }, width: { ideal: 1920 } } : { width: { ideal: 1920 }, height: { ideal: 1080 } }, audio: false });
     $('#camVideo').srcObject = camStream;
+    $('#camVideo').onloadedmetadata = () => camStageFit();
     const cams = (await navigator.mediaDevices.enumerateDevices()).filter((d) => d.kind === 'videoinput');
     const sel = $('#camSel');
     sel.hidden = cams.length < 2;
     if (cams.length > 1 && !sel.options.length) {
       sel.innerHTML = cams.map((c, i) => `<option value="${esc(c.deviceId)}">${esc(c.label || '카메라 ' + (i + 1))}</option>`).join('');
     }
-    $('#camMsg').textContent = '얼굴을 화면 가운데에 맞추고 [📸 찍기]';
+    $('#camMsg').textContent = '얼굴을 가이드선에 맞추고 [📸 찍기] · 겹쳐 볼 사진이 있으면 눈·코·이마를 겹쳐 맞추세요 (개구기를 끼면 입 주변은 달라도 정상)';
+    camFaceStart();
   } catch (err) {
     console.error(err);
     $('#camMsg').textContent = '카메라를 켤 수 없어요 · 카메라가 연결돼 있는지, 브라우저 카메라 권한을 허용했는지 확인해 주세요';
@@ -1331,6 +1334,9 @@ async function camStart(deviceId) {
 }
 function camMode(shot) {
   $('#camVideo').hidden = shot; $('#camShot').hidden = !shot;
+  $('#camTools').hidden = shot;
+  if (shot) $('#camCheck').hidden = true;
+  camGhostApply(shot);
   $('#camSnap').hidden = shot; $('#camRetake').hidden = !shot;
   $('#camTo1').hidden = !shot || camTarget === 2; $('#camTo2').hidden = !shot || camTarget === 1;
 }
@@ -1339,7 +1345,11 @@ function camOpen(target) {
   camTarget = target || 0;
   camShotData = null; camMode(false);
   $('#camTitle').textContent = camTarget ? `📷 원본 ${camTarget} (${camTarget === 1 ? '자연스러운 미소' : '개구기'}) 촬영` : '📷 사진 촬영';
+  // 겹쳐 볼 사진: 찍을 원본의 반대쪽 (모르면 있는 쪽, 둘 다 있으면 원본 1)
+  const g = camTarget ? 3 - camTarget : (slotGhost.s1 ? 1 : slotGhost.s2 ? 2 : 0);
+  $('#camGhostSel').value = String(slotGhost['s' + g] ? g : 0);
   openOv('camOv'); camStart();
+  camGhostApply(false);
 }
 $('#camBtn').addEventListener('click', () => camOpen(0));
 $('#camSel').addEventListener('change', (e) => camStart(e.target.value));
@@ -1365,6 +1375,159 @@ for (const k of [1, 2]) {
     camStop(); closeOv('camOv');
   });
 }
+
+// 📸 v3.46 가이드 촬영: ① 고스트(반투명 사진·윤곽선) ② 가이드선 ③ 실시간 자동 확인 (태블릿 앱과 같은 기준)
+let slotGhost = {}, camGm = 'photo', camRef = null, camOutlineKey = '';
+const GUIDE = { midX: 0.5, eyeY: 0.40, occY: 0.66, ovalCy: 0.50, ovalR: 0.30, eyeDist: 0.24 };
+function camStageFit() {
+  const v = $('#camVideo');
+  if (v.videoWidth) $('#camStage').style.setProperty('--ar', String(v.videoWidth / v.videoHeight));
+  camGuideDraw(false);
+}
+function camGhostKey() { return Number($('#camGhostSel').value) || 0; }
+function camGhostApply(shot) {
+  const k = camGhostKey(), b = k ? slotGhost['s' + k] : null;
+  const src = b ? 'data:image/jpeg;base64,' + b : '';
+  for (const o of $('#camGhostSel').options) if (o.value !== '0') o.disabled = !slotGhost['s' + o.value];
+  const op = Number($('#camOp').value) / 100;
+  $('#camOpVal').textContent = Math.round(op * 100) + '%';
+  $('#camGhostMode').hidden = !b; $('#camOpRow').hidden = !b;
+  const gi = $('#camGhost'), oi = $('#camOutline');
+  if (gi.dataset.src !== src) { gi.dataset.src = src; gi.src = src || ''; camRef = null; if (b) camRefDetect(src); }
+  gi.hidden = !!shot || !b || camGm !== 'photo';
+  gi.style.opacity = op;
+  oi.hidden = !!shot || !b || camGm !== 'outline';
+  oi.style.opacity = Math.min(1, op * 2.2);
+  if (b && camGm === 'outline' && camOutlineKey !== src) { camOutlineKey = src; camOutline(src).then((u) => { if (camOutlineKey === src) oi.src = u; }); }
+  camGuideDraw(!!shot);
+}
+// 원본 1(미소)을 찍을 때만 교합평면선, 겹쳐 볼 사진이 없을 때만 얼굴 타원
+function camGuideDraw(shot) {
+  const svg = $('#camGuide'), v = $('#camVideo');
+  const w = v.videoWidth || 1600, h = v.videoHeight || 1200;
+  svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
+  svg.style.display = shot || !$('#camGuideOn').checked ? 'none' : '';
+  const ok = svg.dataset.ok === '1';
+  const col = ok ? '#3DDC97' : '#FFE14D', sw = Math.max(2, w / 500);
+  const occ = camTarget === 1 || (camTarget === 0 && camGhostKey() === 2);
+  const oval = !camGhostKey() || !slotGhost['s' + camGhostKey()];
+  const ry = h * GUIDE.ovalR, rx = Math.min(w * 0.45, ry * 0.78);
+  svg.innerHTML = `<g fill="none" stroke="${col}" stroke-width="${sw}" opacity=".9">
+    <line x1="${w * GUIDE.midX}" y1="0" x2="${w * GUIDE.midX}" y2="${h}" stroke-dasharray="${sw * 5} ${sw * 3.5}"/>
+    <line x1="${w * 0.12}" y1="${h * GUIDE.eyeY}" x2="${w * 0.88}" y2="${h * GUIDE.eyeY}"/>
+    ${occ ? `<line x1="${w * 0.3}" y1="${h * GUIDE.occY}" x2="${w * 0.7}" y2="${h * GUIDE.occY}" stroke-dasharray="${sw * 5} ${sw * 3.5}"/>` : ''}
+    ${oval ? `<ellipse cx="${w / 2}" cy="${h * GUIDE.ovalCy}" rx="${rx}" ry="${ry}"/>` : ''}</g>`;
+}
+// ① 윤곽선: 사진 경계선만 하늘색으로 (배경 투명)
+async function camOutline(src) {
+  const im = new Image(); im.src = src; await im.decode();
+  const k = Math.min(1, 720 / Math.max(im.width, im.height));
+  const w = Math.round(im.width * k), h = Math.round(im.height * k);
+  const c = document.createElement('canvas'); c.width = w; c.height = h;
+  const x = c.getContext('2d'); x.filter = 'blur(1.5px) grayscale(1)'; x.drawImage(im, 0, 0, w, h);
+  const d = x.getImageData(0, 0, w, h).data, out = x.createImageData(w, h);
+  const g = (i, j) => d[(j * w + i) * 4];
+  for (let j = 1; j < h - 1; j++) for (let i = 1; i < w - 1; i++) {
+    const gx = -g(i - 1, j - 1) - 2 * g(i - 1, j) - g(i - 1, j + 1) + g(i + 1, j - 1) + 2 * g(i + 1, j) + g(i + 1, j + 1);
+    const gy = -g(i - 1, j - 1) - 2 * g(i, j - 1) - g(i + 1, j - 1) + g(i - 1, j + 1) + 2 * g(i, j + 1) + g(i + 1, j + 1);
+    const a = Math.max(0, Math.min(255, (Math.hypot(gx, gy) / 4 - 45) * 5));
+    if (a > 0) { const o = (j * w + i) * 4; out.data[o] = 0; out.data[o + 1] = 229; out.data[o + 2] = 255; out.data[o + 3] = a; }
+  }
+  x.filter = 'none'; x.putImageData(out, 0, 0);
+  return c.toDataURL('image/png');
+}
+$('#camGhostSel').addEventListener('change', () => camGhostApply(false));
+$('#camOp').addEventListener('input', () => camGhostApply(false));
+$('#camGuideOn').addEventListener('change', () => camGuideDraw(false));
+$('#camGhostMode').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-gm]'); if (!b) return;
+  camGm = b.dataset.gm;
+  for (const x of $('#camGhostMode').querySelectorAll('[data-gm]')) x.setAttribute('aria-pressed', String(x === b));
+  camGhostApply(false);
+});
+
+// ③ 실시간 자동 확인: MediaPipe 얼굴 특징점 (인터넷에서 한 번 받아 옴, 못 받으면 가이드선만)
+const MP = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14';
+const MP_MODEL = 'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task';
+let mpVideo = null, mpImage = null, mpLoading = null, camRaf = 0, camLastT = 0;
+function mpLoad() {
+  if (!mpLoading) {
+    mpLoading = (async () => {
+      const vision = await import(MP + '/vision_bundle.mjs');
+      const fs = await vision.FilesetResolver.forVisionTasks(MP + '/wasm');
+      const mk = (mode) => vision.FaceLandmarker.createFromOptions(fs, { baseOptions: { modelAssetPath: MP_MODEL }, runningMode: mode, numFaces: 1 });
+      mpVideo = await mk('VIDEO'); mpImage = await mk('IMAGE');
+    })().catch((e) => { console.warn('얼굴 인식 못 불러옴', e); mpLoading = null; throw e; });
+  }
+  return mpLoading;
+}
+// 특징점 → 자세 (픽셀 기준): 눈동자 468·473, 코끝 1
+function camPose(lm, w, h) {
+  if (!lm || lm.length < 474) return null;
+  const P = (i) => ({ x: lm[i].x * w, y: lm[i].y * h });
+  let a = P(468), b = P(473); if (a.x > b.x) [a, b] = [b, a];
+  const n = P(1), mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+  const d = Math.hypot(b.x - a.x, b.y - a.y);
+  return {
+    roll: Math.atan2(b.y - a.y, b.x - a.x) * 180 / Math.PI,
+    yaw: (n.x - mid.x) / d * 90, pitch: (n.y - mid.y) / d * 90, // 같은 방식으로 잰 값끼리만 비교
+    dist: d / w, mx: mid.x / w, my: mid.y / h,
+  };
+}
+// 태블릿 face_align.dart 의 checkAlign 과 같은 기준·문구
+function camCheck(live, ref) {
+  if (!live) return { face: false, items: [], msg: '얼굴을 화면 가운데에 맞춰 주세요' };
+  const it = [];
+  const dr = live.roll - (ref ? ref.roll : 0);
+  it.push(['수평', Math.abs(dr) <= (ref ? 2.5 : 3), dr > 0 ? '고개가 기울었어요 (화면 오른쪽이 낮음) · 고개를 바로 세워 주세요' : '고개가 기울었어요 (화면 왼쪽이 낮음) · 고개를 바로 세워 주세요']);
+  const dy = live.yaw - (ref ? ref.yaw : 0);
+  it.push(['정면', Math.abs(dy) <= (ref ? 6 : 10), '얼굴이 옆으로 돌아갔어요 · 카메라를 정면으로 보게 해 주세요']);
+  if (ref) { const dp = live.pitch - ref.pitch; it.push(['고개', Math.abs(dp) <= 6, dp < 0 ? '턱이 들렸어요 · 턱을 조금 내려 주세요' : '고개를 숙였어요 · 턱을 조금 들어 주세요']); }
+  const k = live.dist / (ref ? ref.dist : GUIDE.eyeDist * 0.75);
+  it.push(['거리', Math.abs(k - 1) <= (ref ? 0.06 : 0.15), k > 1 ? '너무 가까워요 · 조금 뒤로 물러나 주세요' : '너무 멀어요 · 조금 더 가까이 와 주세요']);
+  const ddx = live.mx - (ref ? ref.mx : GUIDE.midX), ddy = live.my - (ref ? ref.my : GUIDE.eyeY), tp = ref ? 0.035 : 0.05;
+  it.push(['위치', Math.abs(ddx) <= tp && Math.abs(ddy) <= tp, Math.abs(ddx) >= Math.abs(ddy)
+    ? (ddx > 0 ? '얼굴이 화면 오른쪽에 있어요 · 카메라를 오른쪽으로 조금 옮겨 주세요' : '얼굴이 화면 왼쪽에 있어요 · 카메라를 왼쪽으로 조금 옮겨 주세요')
+    : (ddy > 0 ? '얼굴이 화면 아래쪽에 있어요 · 카메라를 조금 내려 주세요' : '얼굴이 화면 위쪽에 있어요 · 카메라를 조금 올려 주세요')]);
+  const bad = it.find((x) => !x[1]);
+  return { face: true, items: it, ok: !bad, msg: bad ? bad[2] : '좋아요! 지금 찍으세요' };
+}
+window.__camCheck = camCheck; // 시험용
+async function camRefDetect(src) {
+  try {
+    await mpLoad();
+    const im = new Image(); im.src = src; await im.decode();
+    const r = mpImage.detect(im);
+    if ($('#camGhost').dataset.src === src) camRef = camPose(r.faceLandmarks && r.faceLandmarks[0], im.width, im.height);
+  } catch (e) { /* 기준 없이 가이드선 기준 */ }
+}
+function camShow(r) {
+  const box = $('#camCheck'); box.hidden = false;
+  $('#camChips').innerHTML = r.face ? r.items.map((x) => `<span class="${x[1] ? 'ok' : ''}">${x[0]} ${x[1] ? '✓' : '✕'}</span>`).join('') : '';
+  $('#camHint').textContent = r.msg;
+  $('#camHint').classList.toggle('ok', !!r.ok);
+  const svg = $('#camGuide'), ok = r.ok ? '1' : '0';
+  if (svg.dataset.ok !== ok) { svg.dataset.ok = ok; camGuideDraw(false); }
+}
+async function camFaceStart() {
+  camFaceStop();
+  $('#camCheck').hidden = false; $('#camChips').innerHTML = ''; $('#camHint').textContent = '얼굴 인식 준비 중…';
+  try { await mpLoad(); } catch (e) { $('#camHint').textContent = '자동 확인을 못 켰어요 (인터넷 확인) · 가이드선에 맞춰 찍어 주세요'; return; }
+  if (camGhostKey() && !camRef) camRefDetect($('#camGhost').dataset.src || '');
+  const v = $('#camVideo');
+  const loop = () => {
+    camRaf = requestAnimationFrame(loop);
+    const now = performance.now();
+    if (now - camLastT < 200 || !v.videoWidth || v.hidden) return;
+    camLastT = now;
+    try {
+      const r = mpVideo.detectForVideo(v, now);
+      camShow(camCheck(camPose(r.faceLandmarks && r.faceLandmarks[0], v.videoWidth, v.videoHeight), camGhostKey() ? camRef : null));
+    } catch (e) { /* 한 장 놓쳐도 계속 */ }
+  };
+  loop();
+}
+function camFaceStop() { if (camRaf) cancelAnimationFrame(camRaf); camRaf = 0; }
 
 // 태블릿 알림을 PC 에도 (불러왔어요·뺐어요 …)
 let noticeAt = null, toastTimer = 0;

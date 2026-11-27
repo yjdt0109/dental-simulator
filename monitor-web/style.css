@@ -459,6 +459,22 @@ table.rank td { padding: 8px; border-top: 1px solid var(--line); }
 .cam-body { display: grid; gap: 10px; }
 .cam-view { background: #0d1622; border-radius: 12px; overflow: hidden; aspect-ratio: 4 / 3; display: grid; place-items: center; }
 .cam-view video, .cam-view img { width: 100%; height: 100%; object-fit: contain; }
+/* 📸 v3.46 가이드 촬영: 영상 비율 그대로인 무대 위에 고스트·윤곽선·가이드선·자동 확인 */
+.cam-view:has(.cam-stage) { aspect-ratio: auto; display: block; background: #0d1622; }
+.cam-stage { --ar: 1.3333; position: relative; width: min(100%, calc(66vh * var(--ar))); aspect-ratio: var(--ar); margin: 0 auto; }
+.cam-stage video, .cam-stage #camShot { position: absolute; inset: 0; object-fit: fill; }
+.cam-stage .cam-ghost { position: absolute; inset: 0; object-fit: cover; pointer-events: none; opacity: .35; }
+.cam-guide { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.cam-check { position: absolute; left: 8px; right: 8px; top: 8px; display: grid; gap: 4px; justify-items: start; pointer-events: none; }
+.cam-chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.cam-chips span { padding: 2px 9px; border-radius: 99px; color: #fff; font-size: 12px; font-weight: 800; background: rgba(217,54,62,.9); }
+.cam-chips span.ok { background: rgba(0,168,143,.9); }
+.cam-hint { padding: 5px 10px; border-radius: 10px; background: rgba(0,0,0,.7); color: #fff; font-size: 13.5px; font-weight: 700; }
+.cam-hint.ok { background: rgba(0,168,143,.9); }
+.cam-tools { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; font-size: 13px; }
+.cam-tools select { font: inherit; padding: 4px 6px; border-radius: 8px; border: 1px solid var(--line); }
+.cam-tools .seg button { padding: 5px 10px; font-size: 13px; min-height: 32px; }
+.cam-tools input[type=range] { vertical-align: middle; width: 120px; }
 .cam-acts { display: flex; flex-wrap: wrap; gap: 8px; }
 
 /* v3.41 ⚙ 고급 접기 */

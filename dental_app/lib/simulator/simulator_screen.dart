@@ -39,6 +39,7 @@ import '../records/record_photo_picker.dart';
 import '../ai/smile.dart' show makeSmile;
 import '../ai/smile_match.dart';
 import '../ai/final_smile.dart';
+import '../capture/guided_camera.dart';
 import '../privacy/mouth_finder.dart';
 
 import 'package:image/image.dart' as img;
@@ -2705,6 +2706,13 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
         if (s1 != null) 's1': await jpegBase64(s1, maxSide: 240, quality: 70),
         if (s2 != null) 's2': await jpegBase64(s2, maxSide: 240, quality: 70),
       });
+      // 📸 PC 가이드 촬영의 겹쳐 보기용 (중간 크기, 원본 2 는 눈 가리기 전 사진)
+      final g2 = _slotPhoto(p, 2);
+      final s2g = g2 == null ? null : (g2.eyeOrig ?? g2.beforeBytes);
+      CastService.instance.put('slotGhost', {
+        if (s1 != null) 's1': await jpegBase64(s1, maxSide: 960, quality: 72),
+        if (s2g != null) 's2': await jpegBase64(s2g, maxSide: 960, quality: 72),
+      });
     }
     final sm = p.smile;
     if (sm == null) {
@@ -4412,8 +4420,16 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
     _select(t);
   }
 
+  /// 📸 가이드 촬영 때 겹쳐 볼 사진: 다른 원본 (눈 가리기 전 사진 우선 — 눈을 맞춰야 하므로)
+  Uint8List? _ghostFor(PatientPhoto p, int k) {
+    if (k == 2) return _slot1Bytes(p);
+    final q = _slotPhoto(p, 2);
+    return q == null ? null : (q.eyeOrig ?? q.beforeBytes);
+  }
+
   Future<void> _slotUpload(PatientPhoto p, int k) async {
     final canCamera = _picker.supportsImageSource(ImageSource.camera);
+    var guided = false;
     final src = canCamera
         ? await showModalBottomSheet<ImageSource>(
             context: context,
@@ -4426,7 +4442,20 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
                 children: [
                   ListTile(
                     leading: const Icon(Icons.photo_camera_outlined),
-                    title: Text('원본 $k 촬영'),
+                    title: Text('원본 $k 촬영 (가이드선 · 겹쳐 보기)'),
+                    subtitle: Text(
+                      _ghostFor(p, k) != null
+                          ? '먼저 찍은 원본 ${3 - k} 이 반투명으로 겹쳐 보여요'
+                          : '정중선·눈동자선·얼굴 타원에 맞춰 찍어요',
+                    ),
+                    onTap: () {
+                      guided = true;
+                      Navigator.pop(ctx, ImageSource.camera);
+                    },
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.camera_outlined),
+                    title: const Text('기본 카메라 앱으로 촬영'),
                     onTap: () => Navigator.pop(ctx, ImageSource.camera),
                   ),
                   ListTile(
@@ -4449,6 +4478,16 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
           )
         : ImageSource.gallery;
     if (src == null) return;
+    if (guided) {
+      final b = await openGuidedCamera(
+        context,
+        slot: k,
+        ghost: _ghostFor(p, k),
+      );
+      if (b == null || !mounted) return;
+      await _setSlot(p, k, b);
+      return;
+    }
     try {
       final f = await _picker.pickImage(
         source: src,

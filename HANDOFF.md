@@ -4,9 +4,9 @@
 > "HANDOFF.md 읽고 이어서 작업해줘"라고 하면 됩니다. 답변은 항상 한글로.
 
 ## 1. 현재 버전
-- 태블릿 앱(안드로이드 APK, Flutter): **2026.11.27-g** (고정 열쇠 서명, analyze·test 156개·APK 빌드 확인) (`lib/cast/cast_service.dart`의 `appVersion`)
-- 상담 PC 모니터(웹, Netlify에 폴더째 끌어다 놓기): **v3.45** (`monitor-web/`)
-- 자동 테스트: 156개 모두 통과 (`flutter test`)
+- 태블릿 앱(안드로이드 APK, Flutter): **2026.11.27-h** (고정 열쇠 서명, analyze·test 165개·APK 빌드 확인) (`lib/cast/cast_service.dart`의 `appVersion`)
+- 상담 PC 모니터(웹, Netlify에 폴더째 끌어다 놓기): **v3.46** (`monitor-web/`)
+- 자동 테스트: 165개 모두 통과 (`flutter test`)
 
 ## 2. 구성
 - `dental_app/` — Flutter 앱 (lib, test, android, web)
@@ -50,11 +50,16 @@
 32. **2026.11.27-e (PC 변경 없음)**: **폰(가로 700 미만)**에서 새 화면 위 단계 표시줄(1 사진 › 2 › … 7) 숨김(`_stepBar`, 이동은 [이전]/[다음]) + 메인 사진 아래 🪄 도구 줄(🪄·붓·지우개·기준점·되돌리기·지우기) 숨김(`RoiEditor.showSamBar`, 미소 미리보기 화면의 붓 도구는 그대로). 태블릿·PC 는 그대로
 33. **2026.11.27-f / PC v3.45 (사용자 요청)**: 새 화면 단계 7개 → **6개** (① 사진 ② 치료 정하기 ③ After 만들기 ④ 다듬기 ⑤ Final Smile ⑥ 저장) — '치아 고르기' 단계 뺌(🪄 선택은 1단계 사진 탭으로 그대로). PC `step` 명령도 1~6. **상담 메모**는 2단계에서 빼서 마지막 저장 단계(`_panelParts {6, 7}`)로. ③ After 단계의 설명 글·엔진 줄 뺌 → **[기준 사진 고르기]** 버튼(`_basePicker`·`_openBasePicker`·`_baseChoices`·`_pickBase`: 원본 2·원본 2 의 After N·원본 1·원본 1 의 After N 중 고르면 그 원본으로 옮기고 `basePick` 지정 → 그 사진을 바탕으로 변환). PC: state `bases [{k,n,l}]`·`baseNow "k:n"`, 명령 `basePick {k,n}`, 오른쪽 패널 [🔁 기준 사진 고르기] 선택 칸(예전 태블릿이면 예전 안내 글), 엔진 줄(`#engineNow`) 숨김, **상담 메모를 오른쪽 패널 [저장 및 상담 완료] 바로 위로** 옮김(`.memo-box.in-panel`). PC 화면은 가짜 Firebase(Playwright, gstatic 주소를 가짜 모듈로 바꿔 끼움)로 확인
 34. **2026.11.27-g (PC 변경 없음)**: Final Smile 결과 치아가 **길게** 나오던 문제 — 원인: After 는 개구기 사진이라 치아가 끝까지 보여서 나노바나나가 그 길이를 그대로 옮겨 입술 사이를 꽉 채움. → 지시문에 `kFinalSmileKeepLength`(첫 사진의 절단끝 높이·보이는 길이·아랫니·어두운 틈·입꼬리 그림자 유지, After 는 모양·배열·비율·색 참고만) 추가 (`finalSmilePrompt(keepLength, extra)`, 사용자 문구 `kFinalSmilePrompt` 는 그대로 앞에). **5단계 옵션**(`_finalOptions`): 쓸 After 고르기(`_finalAfterKey`, `_afterChoices`), [지난 Final Smile 을 바탕으로 이어서 다듬기](`_finalFromPrev` → `makeFinalSmile(base:)`, 입술 고정은 항상 원본 1), [원래 미소의 치아 길이 유지](기본 켬), 추가 요청 칸 + 빠른 문구(짧게·길게·더 하얗게 …), 버튼 [Final Smile 다시 만들기], [🦷 Final Smile 치아 크기 조절](목록 선택을 Final Smile 로 → `_openResize`). 결과는 '✨ Final Smile 2, 3 …' 로 쌓임. `_finalAfter` 가 못 찾으면 목록의 After(기록에서 불러온 것·크기조절 포함)까지 찾음 (사용자 화면에서 Final Smile 뒤 '먼저 3단계에서 After…' 로 버튼이 막혔던 것 대비 — 재현은 못 함). PC [2단계] 버튼도 태블릿의 이 설정으로 만듦
-35. **상담 PC**: 위 기능 대부분을 마우스로 (SAM, 기준점, 크기 조절, QA, 보관함, 기록, 미소)
+35. **📸 가이드 촬영 (2026.11.27-h / PC v3.46, 사용자 요청: 원본 1·2 각도·배율 맞추기)**: 
+   - **태블릿·폰**: 새 앱 안 촬영 화면 `lib/capture/guided_camera.dart` (`camera` 패키지 0.12, 후면 카메라, `ResolutionPreset.max`, 세로 고정, NV21 프레임). 원본 카드 [촬영] → 시트에 '원본 k 촬영 (가이드선 · 겹쳐 보기)'(새 화면) / '기본 카메라 앱으로 촬영'(예전 방식, 예비) / 갤러리 / 환자 기록. ① **고스트**: 먼저 찍은 다른 원본(`_ghostFor`: 원본 2 는 눈 가리기 전 `eyeOrig`)을 반투명(기본 35%, 15~70% 막대) 또는 **윤곽선**(`ghostOutline`: 소벨 경계 하늘색 PNG) 또는 끄기. ② **가이드선**(`GuidePainter`, 위치는 `GuideGeom`): 수직 정중선(점선) · 눈동자 수평선 · 얼굴 타원(겹쳐 볼 사진이 없을 때만) · 교합평면선(원본 1 촬영 때만). ③ **실시간 자동 확인**: ML Kit 얼굴 인식(300ms 마다) → `face_align.dart` `checkAlign`: 수평(눈동자선 기울기 ±2.5°)·정면(yaw ±6°)·고개(pitch ±6°, 기준 사진 있을 때만)·거리(눈 사이 ±6%)·위치(±3.5%) — 기준 = 먼저 찍은 사진의 얼굴(`facePoseOfPhoto`), 없으면 화면 가이드. 칩(✓/✕) + 가장 먼저 고칠 것 한 줄(예: '너무 멀어요 · 조금 더 가까이'), 모두 맞으면 초록. 자동 셔터는 아직 안 함(다음 단계 후보). 테스트 `test/guided_camera_test.dart`(`debugCameraPreview`·`debugCameraShot`·`debugLiveAlign`)
+   - **PC**: 태블릿이 `slotGhost {s1, s2}`(긴 변 960) 를 보냄. [📷 사진 촬영] 창: 영상 비율 그대로인 무대(`.cam-stage`, `--ar`) 위에 고스트(반투명/윤곽선, 투명도), SVG 가이드선, 자동 확인(MediaPipe tasks-vision 0.10.14 jsdelivr + face_landmarker.task, 눈동자 468·473·코끝 1 → `camPose`/`camCheck` = 태블릿과 같은 기준·문구). 얼굴 인식을 못 불러오면 '가이드선에 맞춰 찍어 주세요'. Playwright 로 가짜 웹캠·로컬 MediaPipe 파일로 확인(이 작업 환경은 jsdelivr 막힘)
+   - **실제 기기 확인 필요**: 카메라 미리보기와 찍힌 사진의 화면 비율이 기종에 따라 다르면 고스트가 살짝 어긋날 수 있음(태블릿). 얼굴 인식 방향(센서 각도)도 기기에서 확인
+36. **상담 PC**: 위 기능 대부분을 마우스로 (SAM, 기준점, 크기 조절, QA, 보관함, 기록, 미소)
 
 ## 4. 마지막 대화에서 논의 중이던 것 (다음 할 일)
 - ③·② 넣음(2026.11.25-f) → 사용자 실제 테스트 결과 대기. 남은 제안: ④ 일반 라미네이트·크라운에도 원하는 절단선 지정, 경계 자동 검사(차이 크면 재시도)
 - 다음 후보: 실제 보철·교정 **완성 사진**을 앱에서 환자 기록에 추가 → PC `환자이름/치료완성/날짜/` 로 저장 (사용자가 시뮬레이션과 구분 원함)
+- **📸 가이드 촬영 (2026.11.27-h) → 실제 태블릿·PC 웹캠에서 확인 대기**. 다음 후보: 모두 초록이면 자동 셔터, 찍은 뒤 맞춤 점수
 - **Final Smile 길이 문제 (2026.11.27-g 고침) → 실제 결과 확인 대기**. PC 에도 Final Smile 옵션(추가 요청·이어서 다듬기) 넣을지는 사용자 결정
 - **사용자 지적(결정 대기)**: [😊 미소에 입히기] 결과 치아가 변환(보철) 사진 치아와 안 닮음. 제안: ① 정밀 매칭 [지금 결과 쓰기]로 시험 ② 변환 치아만 잘라 보내기 + 결과 치아 숫자 검사·재시도 ③ 미소에 입히기를 정밀 매칭 방식으로 교체
 - 브리핑 목록 '짝 자동 비교'는 사용자가 중지시킴 → 브랜치 `wip-pair-compare` 에 보관만 (main 에 없음)
@@ -73,7 +78,7 @@ flutter pub get
 flutter test
 flutter build apk --release   # build/app/outputs/flutter-apk/app-release.apk
 ```
-- PC 모니터: `monitor-web` 폴더를 Netlify에 그대로 올림 (사용자에게는 `monitor-web-v3.xx.zip` 으로 묶어 전달). 새 버전 만들 때 index.html의 버전(지금 3.45)을 올림
+- PC 모니터: `monitor-web` 폴더를 Netlify에 그대로 올림 (사용자에게는 `monitor-web-v3.xx.zip` 으로 묶어 전달). 새 버전 만들 때 index.html의 버전(지금 3.46)을 올림
 - 버전 올리기: `lib/cast/cast_service.dart`의 `appVersion` + PC `app.js` 안의 "2026.11.26-c 이상" 문구
 
 ## 6. 주요 파일
