@@ -263,6 +263,11 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
         's2': _slotPhoto(p, 2) != null,
         'final': {'can': _finalReady(p), 'busy': _finalBusy, 'msg': _finalMsg},
       },
+      'eye': {
+        'ok': EyeMasker.supported,
+        'on': _eyeMask,
+        'has': _eyeTarget(p)?.eyeOrig != null,
+      },
       'smileRef': {
         'has': p.smile != null,
         'on': _smileRef,
@@ -790,9 +795,7 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
                         value: _eyeMask,
                         onChanged: (v) {
                           setSheet(() => _eyeMask = v);
-                          SharedPreferences.getInstance()
-                              .then((pr) => pr.setBool(_prefEyeMask, v))
-                              .ignore();
+                          _setEyeMask(v);
                         },
                       ),
                     ListTile(
@@ -1027,15 +1030,88 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
   /// 비교 목록에서 사진 빼기 (원본 제외)
   void _removePhoto(PatientPhoto p, int n) {
     final label = _label(p, n);
+    final bytes = n < 0 ? p.bytesOf(n) : null;
     String? done;
     setState(() => done = p.removePhoto(n, label));
     if (done == null) return;
+    // 원본 1(미소) 사진을 목록에서 빼면 위쪽 [원본 1] 카드에서도 뺌
+    if (bytes != null && _isSlot1Photo(p, bytes)) {
+      _clearSlot1(p);
+      _smilePublish(p);
+      _toast('🗑 원본 1 (자연스러운 미소) 사진을 뺐습니다 · 위 카드에서 다시 넣을 수 있어요');
+      return;
+    }
     _smilePublish(p);
     _toast(
       n > 0
           ? '🗑 \'$label\' 을(를) 목록에서 뺐습니다 · [이전으로]로 되돌릴 수 있어요'
           : '🗑 \'$label\' 을(를) 목록에서 뺐습니다',
     );
+  }
+
+  bool _isSlot1Photo(PatientPhoto p, Uint8List b) {
+    bool same(Uint8List? a) =>
+        a != null &&
+        (identical(a, b) || (a.length == b.length && listEquals(a, b)));
+    return same(_slotPhoto(p, 1)?.beforeBytes) || (p.slot != 1 && same(p.smile));
+  }
+
+  /// 원본 1 슬롯 비우기 (원본 2 쪽의 미소 사진 연결도 끊음)
+  void _clearSlot1(PatientPhoto p) {
+    final s1 = _slotPhoto(p, 1);
+    setState(() {
+      if (s1 != null && !identical(s1, p)) {
+        _patients.remove(s1);
+        if (identical(p.pair, s1)) p.pair = null;
+      }
+      if (p.slot != 1) {
+        p.smile = null;
+        p.smileSet = null;
+        p.smileSize = Size.zero;
+        p.extras.removeWhere((e) => e.sub == '미소 사진');
+        p.sel = [];
+      }
+    });
+  }
+
+  /// 👁 눈 가리기를 바꿀 사진: 지금 환자의 원본 2(개구기), 슬롯이 아니면 지금 사진
+  PatientPhoto? _eyeTarget(PatientPhoto p) =>
+      _slotPhoto(p, 2) ?? (p.slot == 1 || p.blank ? null : p);
+
+  /// 👁 눈 자동 가리기 켜기/끄기 — 설정을 기억하고 지금 개구기 사진에도 바로 적용
+  Future<void> _setEyeMask(bool v) async {
+    setState(() => _eyeMask = v);
+    SharedPreferences.getInstance()
+        .then((pr) => pr.setBool(_prefEyeMask, v))
+        .ignore();
+    final p = _cur;
+    final q = p == null ? null : _eyeTarget(p);
+    String msg = v ? '👁 눈 자동 가리기를 켰습니다' : '👁 눈 자동 가리기를 껐습니다';
+    if (q != null) {
+      if (!v && q.eyeOrig != null && !identical(q.beforeBytes, q.eyeOrig)) {
+        q.beforeBytes = q.eyeOrig!;
+        msg = '👁 눈 가리기를 없앴습니다 (다시 켜면 가려요)';
+      } else if (v && q.eyeMasked != null) {
+        q.beforeBytes = q.eyeMasked!;
+        msg = '👁 눈을 다시 가렸습니다';
+      } else if (v && EyeMasker.supported) {
+        try {
+          final m = await EyeMasker.mask(q.beforeBytes);
+          if (m != null) {
+            q.eyeOrig ??= q.beforeBytes;
+            q.eyeMasked = m;
+            q.beforeBytes = m;
+            msg = '👁 눈을 가렸습니다';
+          }
+        } catch (e) {
+          debugPrint('eye mask: $e');
+        }
+      }
+    }
+    if (!mounted) return;
+    setState(() {});
+    if (p != null) _smilePublish(p);
+    _toast(msg);
   }
 
   ModalRoute<Object?>? _myRoute;
@@ -1072,6 +1148,8 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
     );
     img.dispose();
     if (masked) {
+      p.eyeOrig = original;
+      p.eyeMasked = bytes;
       // [이전으로] 를 누르면 가리기 전 원본으로
       p.history.add(
         PhotoSnap(label: '눈 가리기', before: original, editing: true, roi: p.roi),
@@ -1340,6 +1418,8 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
         setState(() => _smileRef = v == true);
       case 'autoMatch': // PC 변환 후 미소 사진에 자동 매칭
         setState(() => _autoMatch = v == true);
+      case 'eyeMask': // PC 👁 눈 자동 가리기 켜기/끄기 (지금 개구기 사진에도 바로 적용)
+        _setEyeMask(v == true);
       case 'cmpRemove': // PC 비교 목록 ✕ (목록 위치 번호)
         if (v is int && v > 0 && v < p.listOrder.length) {
           _removePhoto(p, p.listOrder[v]);
@@ -4169,9 +4249,12 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
   }) async {
     // 옆으로 누운 사진(EXIF 방향)은 바로 세움
     var data = await compute(normalizeOrientation, bytes);
+    final plain = data;
+    Uint8List? masked;
     if (mask && k == 2 && _eyeMask && EyeMasker.supported) {
       try {
-        data = await EyeMasker.mask(bytes) ?? bytes; // 개구기 사진만 눈 가리기
+        masked = await EyeMasker.mask(data); // 개구기 사진만 눈 가리기
+        if (masked != null) data = masked;
       } catch (e) {
         debugPrint('eye mask: $e');
       }
@@ -4181,6 +4264,10 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
     final np = await _makeSlotPhoto(data, k, p.consult);
     if (!mounted) return;
     np.recordId = p.recordId;
+    if (masked != null) {
+      np.eyeOrig = plain;
+      np.eyeMasked = masked;
+    }
     np.pair = other;
     if (other != null) other.pair = np;
     final i = old == null ? -1 : _patients.indexOf(old);

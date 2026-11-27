@@ -807,17 +807,7 @@ extension _StepFlow on _SimulatorHomeScreenState {
               SwitchListTile(
                 contentPadding: EdgeInsets.zero,
                 value: _eyeMask,
-                onChanged: (v) {
-                  _ss(() => _eyeMask = v);
-                  SharedPreferences.getInstance()
-                      .then(
-                        (pr) => pr.setBool(
-                          _SimulatorHomeScreenState._prefEyeMask,
-                          v,
-                        ),
-                      )
-                      .ignore();
-                },
+                onChanged: (v) => _setEyeMask(v),
                 title: const Text('개구기 사진 눈 자동 가리기'),
               ),
             ),

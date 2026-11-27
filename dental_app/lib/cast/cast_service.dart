@@ -28,7 +28,7 @@ class CastService extends ChangeNotifier {
   static final CastService instance = CastService._();
 
   /// 앱 버전 (PC 상담 모니터에 표시 → 태블릿이 최신 앱인지 확인용)
-  static const appVersion = '2026.11.26-c';
+  static const appVersion = '2026.11.27-a';
 
   /// PC 에서 받은 명령 수 (PC 가 '태블릿이 받았는지' 확인하는 데 씀)
   int cmdCount = 0;

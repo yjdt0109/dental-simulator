@@ -204,6 +204,10 @@ class PatientPhoto {
   final String time;
   final SampleView? view; // null 이면 직접 등록한 사진
   Uint8List beforeBytes; // 눈 가리기 등으로 바뀔 수 있음
+
+  /// 👁 눈 가리기 전 사진 / 가린 사진 (눈 가리기를 켜고 끌 때 바꿔 끼움)
+  Uint8List? eyeOrig;
+  Uint8List? eyeMasked;
   final Size imageSize;
   bool isNew;
 
