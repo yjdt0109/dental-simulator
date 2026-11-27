@@ -41,6 +41,19 @@ Future<void> _settle(WidgetTester t, {bool Function()? until}) async {
 }
 
 void main() {
+  test('원본 2(개구기)의 미소 사진은 비교 목록에서 \'원본 1 (미소)\'', () {
+    final p = PatientPhoto(
+      id: 'a',
+      name: '',
+      type: '',
+      time: '',
+      beforeBytes: jpg(10),
+      imageSize: const Size(120, 90),
+    )..smile = jpg(20);
+    p.noteSmile();
+    expect(p.extras.single.label, '원본 1 (미소)');
+  });
+
   test('비교 목록: 원본 → 변환 결과 → 불러온 사진 차례, 최대 2장, 같은 사진은 한 번만', () {
     final p = PatientPhoto(
       id: 'a',
@@ -131,7 +144,13 @@ void main() {
     });
     await _settle(t);
     expect(find.textContaining('비교할 사진'), findsOneWidget);
-    final labels = ['원본', '😊 미소 1', '😊 미소 2', '😊 이서연 미소', '😊 이서연 미소 미리보기'];
+    final labels = [
+      '원본',
+      '원본 1 (미소)',
+      '😊 미소 2',
+      '😊 이서연 미소',
+      '😊 이서연 미소 미리보기',
+    ];
     double y(String s) => t.getTopLeft(find.text(s).first).dy;
     for (final l in labels) {
       expect(find.text(l), findsWidgets, reason: l);
@@ -140,7 +159,7 @@ void main() {
       expect(y(labels[i]), greaterThan(y(labels[i - 1])), reason: labels[i]);
     }
     // 목록에서 미소 1 과 기록 미소 미리보기를 눌러 비교 (PC 는 위치 번호로)
-    await t.tap(find.text('😊 미소 1'));
+    await t.tap(find.text('원본 1 (미소)'));
     await t.pump();
     await t.runAsync(() async {
       CastService.instance.onRemoteCmd?.call({'t': 'cmpToggle', 'v': 4});

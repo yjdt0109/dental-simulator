@@ -243,12 +243,10 @@ function renderPicker(items, cmp, on) {
       + (src ? `<img src="${src}" alt="">` : '<i class="noimg"></i>')
       + `<span><b>${sel ? '☑' : '☐'}</b> ${esc(label)}</span>`
       + (n > 0 ? `<i class="pick-del" data-del="${n}" title="목록에서 빼기">✕</i>` : '')
-      + (n > 0 ? `<span class="pick-to"><i data-to="1" data-n="${n}" title="이 사진을 원본 1(미소)로">①</i><i data-to="2" data-n="${n}" title="이 사진을 원본 2(개구기)로">②</i></span>` : '') + '</button>';
+      + '</button>'; // v3.44: 사진 왼쪽 위 ①②(원본 1·2로 넣기) 버튼 없앰 (사용자 요청, 원본 카드 📷·📁 로 대신)
   }).join('');
 }
 $('#pickList').addEventListener('click', (e) => {
-  const to = e.target.closest('[data-to]');
-  if (to) { cmd('slotFromList', { s: Number(to.dataset.to), n: Number(to.dataset.n) }); return; } // ①② 원본으로
   const del = e.target.closest('[data-del]');
   if (del) { cmd('cmpRemove', Number(del.dataset.del)); return; } // ✕ 목록에서 빼기
   const b = e.target.closest('.pick'); if (!b) return;

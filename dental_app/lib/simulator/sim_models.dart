@@ -331,7 +331,9 @@ class PatientPhoto {
     final sm = smile, sa = smileAfter;
     if (sm != null && !has(sm)) {
       final k = extras.where((e) => e.sub == '미소 사진').length + 1;
-      addExtra(sm, '😊 미소 $k', sub: '미소 사진');
+      // 원본 2장 구조(원본 2 = 개구기)에서는 미소 사진 = 원본 1 → 이름도 '원본 1 (미소)'
+      final asSlot1 = slot == 2 && !extras.any((e) => e.label == '원본 1 (미소)');
+      addExtra(sm, asSlot1 ? '원본 1 (미소)' : '😊 미소 $k', sub: '미소 사진');
     }
     if (sa != null && !has(sa)) {
       final k = extras.where((e) => e.sub.startsWith('미소 미리보기')).length + 1;
