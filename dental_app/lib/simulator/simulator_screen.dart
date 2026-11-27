@@ -40,6 +40,8 @@ import '../ai/smile.dart' show makeSmile;
 import '../ai/smile_match.dart';
 import '../ai/final_smile.dart';
 import '../capture/guided_camera.dart';
+import '../library/library_screen.dart';
+import '../library/liquify_screen.dart';
 import '../privacy/mouth_finder.dart';
 
 import 'package:image/image.dart' as img;
@@ -3073,22 +3075,125 @@ class _SimulatorHomeScreenState extends State<SimulatorHomeScreen> {
       p.resizeTarget(orig1: _slot1Bytes(p), smileView: _smileView);
 
   /// 크기 조절 결과 넣기: After 였으면 새 After, 다른 사진이면 그 옆에 새 사진
-  void _rzAddResult(PatientPhoto p, int n, Uint8List out) {
+  void _rzAddResult(
+    PatientPhoto p,
+    int n,
+    Uint8List out, {
+    String what = '크기조절',
+  }) {
     if (n > 0) {
-      p.remember('치아 크기 조절');
-      p.addResult(out, _settingsKey(), engine: '크기조절');
+      p.remember(what == '크기조절' ? '치아 크기 조절' : what);
+      p.addResult(out, _settingsKey(), engine: what);
       return;
     }
     final e = p.extras[-n - 1];
     final k = p.addExtra(
       out,
-      '${e.label} · 크기조절',
-      sub: '크기 조절',
+      '${e.label} · $what',
+      sub: what == '크기조절' ? '크기 조절' : what,
       pair: e.pair ?? e.bytes,
     );
     p.sel = [n, k];
     p.editing = false;
     _smileView = false;
+  }
+
+  // ---------------------------------------------------------------------------
+  // 📐 6전치 라이브러리 · 🖐 밀어서 다듬기 (2026.11.27-k)
+  // ---------------------------------------------------------------------------
+  bool _libBusy = false;
+
+  Future<void> _openLibrary(PatientPhoto p) async {
+    final base = p.baseBytes;
+    final im = await decodeImageFromList(base);
+    final size = Size(im.width.toDouble(), im.height.toDouble());
+    im.dispose();
+    if (!mounted) return;
+    final r = await Navigator.of(context).push<LibraryResult>(
+      MaterialPageRoute(
+        builder: (_) =>
+            LibraryScreen(image: base, imageSize: size, shade: _c.shade),
+      ),
+    );
+    if (r == null || !mounted) return;
+    var out = r.image;
+    var engine = '라이브러리 · ${r.form}';
+    if (r.aiBlend) {
+      setState(() => _libBusy = true);
+      try {
+        out = await _libraryBlend(base, r.image, r.lips);
+        engine = '$engine + AI';
+      } catch (e) {
+        _toast('AI 로 다듬지 못해 라이브러리 합성 그대로 넣었어요 ($e)');
+      } finally {
+        if (mounted) setState(() => _libBusy = false);
+      }
+    }
+    if (!mounted) return;
+    setState(() {
+      p.remember('6전치 라이브러리');
+      p.addResult(out, _settingsKey(), engine: engine);
+      p.editing = false;
+      _smileView = false;
+    });
+    _toast('📐 6전치 라이브러리 결과를 ${_label(p, p.results.length)}(으)로 추가했습니다');
+  }
+
+  /// 라이브러리 합성 → AI 로 조명·질감만 (모양·위치 유지) → 입술 밖은 원본, 입술 모양 보호
+  Future<Uint8List> _libraryBlend(
+    Uint8List base,
+    Uint8List comp,
+    List<Offset>? lips,
+  ) async {
+    final s = PipelineSettings.instance;
+    final src = await AiService.decodePhoto(base, maxSide: 2000);
+    final cj = await AiService.photoJpeg(
+      await AiService.decodePhoto(comp, maxSide: 2000),
+    );
+    Uint8List ai;
+    try {
+      ai = await AiService.instance.geminiImage(
+        model: s.nanoProModel,
+        prompt: kLibraryBlendPrompt,
+        jpeg: cj,
+      );
+    } on AiError {
+      try {
+        ai = await AiService.instance.geminiImage(
+          model: s.nanoModel,
+          prompt: kLibraryBlendPrompt,
+          jpeg: cj,
+        );
+      } on AiError {
+        if (!s.hasFal) rethrow;
+        ai = await FalNanoBananaEdit(s.falKey!)
+            .edit(jpegs: [cj], prompt: kLibraryBlendPrompt);
+      }
+    }
+    final o = img.decodeImage(ai);
+    if (o == null) throw const AiError('AI 결과를 읽지 못했습니다');
+    final fitted = await compute((a) => fitAiToSource(a.$1, a.$2), (src, o));
+    if (lips == null || lips.length < 3) {
+      return img.encodeJpg(fitted, quality: 92);
+    }
+    return compute(composeFinalSmile, (src, fitted, lips));
+  }
+
+  Future<void> _openLiquify(PatientPhoto p) async {
+    final n = _rzTargetOf(p);
+    if (n == null) return;
+    final out = await Navigator.of(context).push<Uint8List>(
+      MaterialPageRoute(
+        builder: (_) => LiquifyScreen(image: p.bytesOf(n), title: _label(p, n)),
+      ),
+    );
+    if (out == null || !mounted) return;
+    setState(() => _rzAddResult(p, n, out, what: '밀어서 다듬기'));
+    _toast(
+      n > 0
+          ? '🖐 밀어서 다듬은 결과를 ${_label(p, p.results.length)}(으)로 추가했습니다'
+          : '🖐 밀어서 다듬은 사진을 왼쪽 목록에 추가했습니다',
+    );
   }
 
   String _rzDoneMsg(PatientPhoto p, int n) => n > 0

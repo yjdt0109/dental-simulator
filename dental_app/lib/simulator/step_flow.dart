@@ -301,6 +301,16 @@ extension _StepFlow on _SimulatorHomeScreenState {
             ),
           ),
           const SizedBox(height: 8),
+          // 🖐 포토샵처럼 밀어서 길이·잇몸 쪽 경계 다듬기
+          FilledButton.tonalIcon(
+            style: FilledButton.styleFrom(minimumSize: const Size(0, 48)),
+            onPressed: _rzTargetOf(p) == null || locked
+                ? null
+                : () => _openLiquify(p),
+            icon: const Icon(Icons.gesture_rounded),
+            label: const Text('🖐 밀어서 다듬기 (길이 · 잇몸 쪽으로 밀기)'),
+          ),
+          const SizedBox(height: 8),
           SwitchListTile(
             contentPadding: EdgeInsets.zero,
             value: _showContour,
@@ -874,6 +884,24 @@ extension _StepFlow on _SimulatorHomeScreenState {
           style: TextStyle(
             fontSize: 12,
             color: stale ? const Color(0xFFB26A00) : AppColors.gray500,
+          ),
+        ),
+        const SizedBox(height: 10),
+        // 📐 AI 변환과 따로: 6전치 라이브러리를 입술 안에 끼워 넣기
+        OutlinedButton.icon(
+          style: OutlinedButton.styleFrom(minimumSize: const Size(0, 48)),
+          onPressed: locked || _converting || _libBusy
+              ? null
+              : () => _openLibrary(p),
+          icon: _libBusy
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Icon(Icons.view_column_rounded),
+          label: Text(
+            _libBusy ? 'AI 로 자연스럽게 맞추는 중…' : '📐 6전치 라이브러리로 만들기 (따로)',
           ),
         ),
         const SizedBox(height: 8),

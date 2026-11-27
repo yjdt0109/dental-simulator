@@ -175,6 +175,10 @@ void main() {
     });
     await _settle(t);
     expect(find.textContaining('정하늘 After 1  ▾'), findsOneWidget);
+    expect(find.text('📐 6전치 라이브러리로 만들기 (따로)'), findsOneWidget);
+    send({'t': 'step', 'v': 4});
+    await _settle(t);
+    expect(find.text('🖐 밀어서 다듬기 (길이 · 잇몸 쪽으로 밀기)'), findsOneWidget);
     // 저장 단계로 바로
     send({'t': 'step', 'v': 6});
     await _settle(t);

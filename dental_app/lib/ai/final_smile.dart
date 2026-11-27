@@ -37,6 +37,15 @@ const kFinalSmileKeepLength =
     'upper and lower teeth and the dark corners of the mouth (buccal corridors) as they are in the first image. '
     'Use the second image only as a reference for tooth shape, alignment, the proportions between the teeth and color.';
 
+/// 📐 6전치 라이브러리 합성 → AI 로 자연스럽게 (모양·위치·길이 유지, 조명·질감만)
+const kLibraryBlendPrompt =
+    'This is a dental smile-design mock-up: idealized upper front teeth from a tooth library were placed on the patient photo. '
+    'Make it look like one real clinical photograph. Keep the exact shape, outline, size, length, width, position and '
+    'arrangement of every placed tooth (do not redesign the teeth), keep the lips, gums, face, background and framing unchanged. '
+    'Only add realistic enamel texture, translucency at the incisal edges, natural surface reflections, the soft shadows '
+    'of the lips and the mouth interior, and match the lighting, color temperature and photo grain of the photo. '
+    'Blend the tooth edges naturally with the gums. Photorealistic, no text.';
+
 /// 2단계 지시문 만들기: 기본 문구 + (길이 유지) + (추가 요청, 한글 가능)
 String finalSmilePrompt({bool keepLength = true, String extra = ''}) {
   final b = StringBuffer(kFinalSmilePrompt);
